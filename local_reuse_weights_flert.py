@@ -136,7 +136,7 @@ if __name__ == "__main__":
     parser.add_argument("--bs", type=int, default=4)
     parser.add_argument("--mbs", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=200)
-    parser.add_argument("--early_stopping", type=bool, default=True)
+    parser.add_argument("--early_stopping", action="store_true")
     parser.add_argument("--min_lr", type=float, default=5e-7)
     args = parser.parse_args()
     main(args)

@@ -266,7 +266,3 @@ def get_corpus(corpus: str, fewnerd_granularity: str):
             )
     else:
         raise Exception("no valid corpus.")
-
-
-def to_IO_format(corpus):
-    print()
