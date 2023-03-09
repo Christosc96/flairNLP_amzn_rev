@@ -271,8 +271,13 @@ def main(args):
     tag_type = "ner"
     label_dictionary = corpus.make_label_dictionary(tag_type, add_unk=False)
 
-    token_encoder = TransformerWordEmbeddings(args.transformer)
-    label_encoder = TransformerDocumentEmbeddings(args.transformer)
+    if "entmask" in args.transformer:
+        transformer_path = f"/glusterfs/dfs-gfs-dist/goldejon/flair-models/pretrained_embeddings/{args.transformer}"
+        token_encoder = TransformerWordEmbeddings(transformer_path)
+        label_encoder = TransformerDocumentEmbeddings(transformer_path)
+    else:
+        token_encoder = TransformerWordEmbeddings(args.transformer)
+        label_encoder = TransformerDocumentEmbeddings(args.transformer)
 
     model = DualEncoder(
         token_encoder=token_encoder, label_encoder=label_encoder, tag_dictionary=label_dictionary, tag_type=tag_type

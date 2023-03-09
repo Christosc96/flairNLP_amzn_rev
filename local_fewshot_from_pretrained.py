@@ -1,110 +1,54 @@
 import argparse
-import os
+import copy
+import json
+from pathlib import Path
 
 import numpy as np
+from torch.utils.data import Subset
 
 import flair
-from flair.datasets import CONLL_03, ONTONOTES, WNUT_17, ColumnCorpus
 from flair.models import DualEncoder
 from flair.optim import LinearSchedulerWithWarmup
 from flair.trainers import ModelTrainer
 from flair.training_utils import AnnealOnPlateau
+from local_corpora import get_corpus
 
 
 def main(args):
     if args.cuda:
         flair.device = f"cuda:{args.cuda_device}"
 
-    average_result = []
-    if args.k > 0:
-        for support_set_id in range(5):
-            if args.corpus == "wnut_17":
-                few_shot_corpus = ColumnCorpus(
-                    data_folder=f"data/fewshot/wnut17/{args.k}shot/",
-                    train_file=f"{support_set_id}.txt",
-                    column_format={0: "text", 1: "ner"},
-                    sample_missing_splits=False,
-                    label_name_map={
-                        "corporation": "corporation",
-                        "creative-work": "creative work",
-                        "group": "group",
-                        "location": "location",
-                        "person": "person",
-                        "product": "product",
-                    },
-                )
+    save_base_path = Path(
+        f"{args.cache_path}/fewshot-dual-encoder/"
+        f"{args.transformer}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}_{args.pretrained_on}/"
+    )
 
-                full_corpus = WNUT_17(
-                    label_name_map={
-                        "corporation": "corporation",
-                        "creative-work": "creative work",
-                        "group": "group",
-                        "location": "location",
-                        "person": "person",
-                        "product": "product",
-                    }
-                )
-            elif args.corpus == "conll_03":
-                few_shot_corpus = ColumnCorpus(
-                    data_folder=f"data/fewshot/conll03/{args.k}shot/",
-                    train_file=f"{support_set_id}.txt",
-                    column_format={0: "text", 1: "ner"},
-                    sample_missing_splits=False,
-                    label_name_map={"PER": "person", "LOC": "location", "ORG": "organization", "MISC": "miscellaneous"},
-                )
+    with open(f"data/fewshot/fewshot_{args.corpus}{args.fewnerd_granularity}.json", "r") as f:
+        fewshot_indices = json.load(f)
 
-                full_corpus = CONLL_03(
-                    base_path="data",
-                    column_format={0: "text", 1: "pos", 2: "chunk", 3: "ner"},
-                    label_name_map={"PER": "person", "LOC": "location", "ORG": "organization", "MISC": "miscellaneous"},
-                )
-            elif args.corpus == "ontonotes":
-                few_shot_corpus = ONTONOTES(
-                    label_name_map={
-                        "CARDINAL": "cardinal",
-                        "DATE": "date",
-                        "EVENT": "event",
-                        "FAC": "facility",
-                        "GPE": "geographical social political entity",
-                        "LANGUAGE": "language",
-                        "LAW": "law",
-                        "LOC": "location",
-                        "MONEY": "money",
-                        "NORP": "nationality religion political",
-                        "ORDINAL": "ordinal",
-                        "ORG": "organization",
-                        "PERCENT": "percent",
-                        "PERSON": "person",
-                        "PRODUCT": "product",
-                        "QUANTITY": "quantity",
-                        "TIME": "time",
-                        "WORK_OF_ART": "work of art",
-                    }
-                ).to_nway_kshot(n=-1, k=args.k, tag_type="ner", seed=support_set_id, include_validation=False)
-                full_corpus = few_shot_corpus
-            else:
-                raise Exception("no valid corpus.")
+    base_corpus = get_corpus(args.corpus, args.fewnerd_granularity)
+
+    results = {}
+    for k in args.k:
+        results[f"{k}"] = {"results": []}
+        for seed in range(5):
+            flair.set_seed(seed)
+            corpus = copy.copy(base_corpus)
+            corpus._train = Subset(base_corpus._train, fewshot_indices[f"{k}-{seed}"])
+            corpus._dev = Subset(base_corpus._train, [])
 
             tag_type = "ner"
-            label_dictionary = few_shot_corpus.make_label_dictionary(tag_type, add_unk=False)
-            # force spans == true, there is one split containing only B-*'s
-            label_dictionary.span_labels = True
+            label_dictionary = corpus.make_label_dictionary(tag_type, add_unk=False)
 
-            pretrained_model_path = f"{args.cache_path}/pretrained-dual-encoder/{args.transformer}_{args.pretraining_corpus}{args.fewnerd_granularity}_{args.pretraining_lr}_{args.seed}/final-model.pt"
-            model = DualEncoder.load(pretrained_model_path)
+            model = DualEncoder.load(args.pretrained_model_path)
             model._init_verbalizers_and_tag_dictionary(tag_dictionary=label_dictionary)
 
-            trainer = ModelTrainer(model, few_shot_corpus)
+            trainer = ModelTrainer(model, corpus)
 
-            save_path = (
-                f"{args.cache_path}/fewshot-dual-encoder/"
-                f"{args.transformer}_{args.corpus}_{args.lr}_{args.seed}"
-                f"_pretrained_on{args.pretraining_corpus}{args.fewnerd_granularity}"
-                f"{'_with_early_stopping' if args.early_stopping else ''}/"
-                f"{args.k}shot_{support_set_id}"
-            )
+            save_path = save_base_path / f"{k}shot_{seed}"
 
-            trainer.fine_tune(
+            # 7. run fine-tuning
+            result = trainer.fine_tune(
                 save_path,
                 learning_rate=args.lr,
                 mini_batch_size=args.bs,
@@ -114,105 +58,19 @@ def main(args):
                 train_with_dev=args.early_stopping,
                 min_learning_rate=args.min_lr if args.early_stopping else 0.001,
                 save_final_model=False,
+                anneal_factor=args.anneal_factor,
             )
 
-            result = model.evaluate(
-                data_points=full_corpus.test,
-                gold_label_type=tag_type,
-                out_path=f"{save_path}/predictions.txt",
-            )
-            with open(
-                f"{save_path}/result.txt",
-                "w",
-            ) as f:
-                f.writelines(result.detailed_results)
+            results[f"{k}"]["results"].append(result["test_score"])
 
-            average_result.append(result.main_score)
+    def postprocess_scores(scores: dict):
+        rounded_scores = [round(float(score) * 100, 2) for score in scores["results"]]
+        return {"results": rounded_scores, "average": np.mean(rounded_scores), "std": np.std(rounded_scores)}
 
-        average_result = [round(float(score) * 100, 2) for score in average_result]
-        with open(
-            f"{args.cache_path}/fewshot-dual-encoder/"
-            f"{args.transformer}_{args.corpus}_{args.lr}_{args.seed}"
-            f"_pretrained_on{args.pretraining_corpus}{args.fewnerd_granularity}"
-            f"{'_with_early_stopping' if args.early_stopping else ''}/"
-            f"{args.k}shot.txt",
-            "w",
-        ) as f:
-            f.write(f"all results: {average_result} \n")
-            f.write(f"average: {np.mean(average_result)} \n")
-            f.write(f"std: {np.std(average_result)} \n")
-    elif args.k == 0:
-        if args.corpus == "wnut_17":
-            full_corpus = WNUT_17(
-                label_name_map={
-                    "corporation": "corporation",
-                    "creative-work": "creative work",
-                    "group": "group",
-                    "location": "location",
-                    "person": "person",
-                    "product": "product",
-                }
-            )
-        elif args.corpus == "conll_03":
-            full_corpus = CONLL_03(
-                base_path="data",
-                column_format={0: "text", 1: "pos", 2: "chunk", 3: "ner"},
-                label_name_map={"PER": "person", "LOC": "location", "ORG": "organization", "MISC": "miscellaneous"},
-            )
-        elif args.corpus == "ontonotes":
-            full_corpus = ONTONOTES(
-                label_name_map={
-                    "CARDINAL": "cardinal",
-                    "DATE": "date",
-                    "EVENT": "event",
-                    "FAC": "facility",
-                    "GPE": "geographical social political entity",
-                    "LANGUAGE": "language",
-                    "LAW": "law",
-                    "LOC": "location",
-                    "MONEY": "money",
-                    "NORP": "nationality religion political",
-                    "ORDINAL": "ordinal",
-                    "ORG": "organization",
-                    "PERCENT": "percent",
-                    "PERSON": "person",
-                    "PRODUCT": "product",
-                    "QUANTITY": "quantity",
-                    "TIME": "time",
-                    "WORK_OF_ART": "work of art",
-                }
-            )
-        else:
-            raise Exception("no valid corpus.")
+    results = {setting: postprocess_scores(result) for setting, result in results.items()}
 
-        tag_type = "ner"
-        label_dictionary = full_corpus.make_label_dictionary(tag_type, add_unk=False)
-        # force spans == true, there is one split containing only B-*'s
-        label_dictionary.span_labels = True
-
-        pretrained_model_path = f"{args.cache_path}/pretrained-dual-encoder/{args.transformer}_{args.pretraining_corpus}{args.fewnerd_granularity}_{args.pretraining_lr}_{args.seed}/final-model.pt"
-        model = DualEncoder.load(pretrained_model_path)
-        model._init_verbalizers_and_tag_dictionary(tag_dictionary=label_dictionary)
-
-        save_path = (
-            f"{args.cache_path}/fewshot-dual-encoder/"
-            f"{args.transformer}_{args.corpus}_{args.lr}_{args.seed}_pretrained_on{args.pretraining_corpus}{args.fewnerd_granularity}/"
-            f"0shot"
-        )
-
-        if not os.path.exists(save_path):
-            os.mkdir(save_path)
-
-        result = model.evaluate(
-            data_points=full_corpus.test,
-            gold_label_type=tag_type,
-            out_path=f"{save_path}/predictions.txt",
-        )
-        with open(
-            f"{save_path}/result.txt",
-            "w",
-        ) as f:
-            f.writelines(result.detailed_results)
+    with open(save_base_path / "results.json", "w") as f:
+        json.dump(results, f)
 
 
 if __name__ == "__main__":
@@ -222,16 +80,21 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--cache_path", type=str, default="/glusterfs/dfs-gfs-dist/goldejon/flair-models")
     parser.add_argument("--corpus", type=str, default="conll_03")
-    parser.add_argument("--pretraining_corpus", type=str, default="ontonotes")
-    parser.add_argument("--pretraining_lr", type=float, default=1e-5)
+    parser.add_argument("--tag_format", type=str, default="BIO")
+    parser.add_argument("--pretrained_model_path", type=str)
+    parser.add_argument("--pretrained_on", type=str)
+    parser.add_argument("--matching_mode", type=str, default="")
     parser.add_argument("--fewnerd_granularity", type=str, default="")
-    parser.add_argument("--k", type=int, default=1)
-    parser.add_argument("--transformer", type=str, default="bert-base-cased")
+    parser.add_argument("--k", type=int, default=1, nargs="+")
+    parser.add_argument("--transformer", type=str, default="bert-base-uncased")
+    parser.add_argument("--use_context", action="store_true")
     parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--bs", type=int, default=4)
     parser.add_argument("--mbs", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=200)
-    parser.add_argument("--early_stopping", type=bool, default=False)
+    parser.add_argument("--early_stopping", action="store_true")
     parser.add_argument("--min_lr", type=float, default=1e-7)
+    parser.add_argument("--anneal_factor", type=float, default=0.5)
+    parser.add_argument("--use_crf", action="store_true")
     args = parser.parse_args()
     main(args)
