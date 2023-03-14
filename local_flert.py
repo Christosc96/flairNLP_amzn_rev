@@ -16,7 +16,7 @@ def main(args):
 
     save_base_path = Path(
         f"{args.cache_path}/pretrained-flert/"
-        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}/"
+        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}{f'_frozen-transformer' if args.freeze_transformer else ''}/"
     )
 
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
@@ -29,7 +29,7 @@ def main(args):
         model=args.transformer,
         layers="-1",
         subtoken_pooling="first",
-        fine_tune=True,
+        fine_tune=args.freeze_transformer,
         use_context=args.use_context,
     )
 
@@ -78,5 +78,6 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--early_stopping", type=bool, default=False)
     parser.add_argument("--min_lr", type=float, default=5e-7)
+    parser.add_argument("--freeze_transformer", action="store_false")
     args = parser.parse_args()
     main(args)
