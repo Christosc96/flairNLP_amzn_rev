@@ -29,7 +29,7 @@ def main(args):
         model=args.transformer,
         layers="-1",
         subtoken_pooling="first",
-        fine_tune=False,
+        fine_tune=True,
         use_context=args.use_context,
     )
 
