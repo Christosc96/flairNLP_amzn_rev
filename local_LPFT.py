@@ -16,7 +16,7 @@ def frozen_pretraining(args):
 
     save_base_path = Path(
         f"{args.cache_path}/pretrained-flert/"
-        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}_LPFT/frozen_pretraining"
+        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.frozen_lr}-{args.finetuning_lr}_{args.seed}_LPFT/frozen_pretraining"
     )
 
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
@@ -51,7 +51,7 @@ def frozen_pretraining(args):
     # 7. run fine-tuning
     trainer.fine_tune(
         save_base_path,
-        learning_rate=args.lr,
+        learning_rate=args.frozen_lr,
         mini_batch_size=args.bs,
         mini_batch_chunk_size=args.mbs,
         max_epochs=args.epochs,
@@ -68,7 +68,7 @@ def finetuning(args):
 
     save_base_path = Path(
         f"{args.cache_path}/pretrained-flert/"
-        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}_LPFT"
+        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.frozen_lr}-{args.finetuning_lr}_{args.seed}_LPFT"
     )
 
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
@@ -84,7 +84,7 @@ def finetuning(args):
     # 7. run fine-tuning
     trainer.fine_tune(
         save_base_path,
-        learning_rate=args.lr,
+        learning_rate=args.finetuning_lr,
         mini_batch_size=args.bs,
         mini_batch_chunk_size=args.mbs,
         max_epochs=args.epochs,
@@ -108,7 +108,8 @@ if __name__ == "__main__":
     parser.add_argument("--fewnerd_granularity", type=str, default="")
     parser.add_argument("--transformer", type=str, default="bert-base-uncased")
     parser.add_argument("--use_context", action="store_true")
-    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument("--frozen_lr", type=float, default=1e-5)
+    parser.add_argument("--finetuning_lr", type=float, default=1e-5)
     parser.add_argument("--bs", type=int, default=4)
     parser.add_argument("--mbs", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=10)
