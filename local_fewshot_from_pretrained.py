@@ -71,10 +71,8 @@ def main(args):
 
                 if not os.path.exists(save_path):
                     os.mkdir(save_path)
-                result = model.evaluate(
-                    corpus.test,
-                    "ner",
-                )
+
+                result = model.evaluate(corpus.test, "ner", out_path=save_path / "predictions.txt")
                 results[f"{k}"]["results"].append(result.main_score)
                 with open(save_path / "result.txt", "w") as f:
                     f.write(result.detailed_results)
