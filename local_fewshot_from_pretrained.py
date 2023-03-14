@@ -34,7 +34,10 @@ def main(args):
         for seed in range(5):
             flair.set_seed(seed)
             corpus = copy.copy(base_corpus)
-            corpus._train = Subset(base_corpus._train, fewshot_indices[f"{k}-{seed}"])
+            if k != 0:
+                corpus._train = Subset(base_corpus._train, fewshot_indices[f"{k}-{seed}"])
+            else:
+                pass
             corpus._dev = Subset(base_corpus._train, [])
 
             tag_type = "ner"
@@ -42,26 +45,39 @@ def main(args):
 
             model = DualEncoder.load(args.pretrained_model_path)
             model._init_verbalizers_and_tag_dictionary(tag_dictionary=label_dictionary)
+            if k > 0:
+                trainer = ModelTrainer(model, corpus)
 
-            trainer = ModelTrainer(model, corpus)
+                save_path = save_base_path / f"{k}shot_{seed}"
 
-            save_path = save_base_path / f"{k}shot_{seed}"
+                # 7. run fine-tuning
+                result = trainer.fine_tune(
+                    save_path,
+                    learning_rate=args.lr,
+                    mini_batch_size=args.bs,
+                    mini_batch_chunk_size=args.mbs,
+                    max_epochs=args.epochs,
+                    scheduler=AnnealOnPlateau if args.early_stopping else LinearSchedulerWithWarmup,
+                    train_with_dev=args.early_stopping,
+                    min_learning_rate=args.min_lr if args.early_stopping else 0.001,
+                    save_final_model=False,
+                    anneal_factor=args.anneal_factor,
+                )
 
-            # 7. run fine-tuning
-            result = trainer.fine_tune(
-                save_path,
-                learning_rate=args.lr,
-                mini_batch_size=args.bs,
-                mini_batch_chunk_size=args.mbs,
-                max_epochs=args.epochs,
-                scheduler=AnnealOnPlateau if args.early_stopping else LinearSchedulerWithWarmup,
-                train_with_dev=args.early_stopping,
-                min_learning_rate=args.min_lr if args.early_stopping else 0.001,
-                save_final_model=False,
-                anneal_factor=args.anneal_factor,
-            )
+                results[f"{k}"]["results"].append(result["test_score"])
+            else:
+                save_path = save_base_path / f"{k}shot_{seed}"
+                import os
 
-            results[f"{k}"]["results"].append(result["test_score"])
+                if not os.path.exists(save_path):
+                    os.mkdir(save_path)
+                result = model.evaluate(
+                    corpus.test,
+                    "ner",
+                )
+                results[f"{k}"]["results"].append(result.main_score)
+                with open(save_path / "result.txt", "w") as f:
+                    f.write(result.detailed_results)
 
     def postprocess_scores(scores: dict):
         rounded_scores = [round(float(score) * 100, 2) for score in scores["results"]]

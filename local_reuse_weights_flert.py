@@ -78,7 +78,7 @@ def match_manual(new_label_dictionary, corpus):
         }
     elif corpus == "wnut_17":
         matching = {
-            b"O": [],
+            b"O": [0],
             b"B-person": [1],
             b"I-person": [2],
             b"B-location": [3, 19, 25],
@@ -135,7 +135,7 @@ def main(args):
 
     save_base_path = Path(
         f"{args.cache_path}/reuse-weights-flert/"
-        f"{args.transformer}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}_{args.pretrained_on}/"
+        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}_{args.pretrained_on}/"
     )
 
     with open(f"data/fewshot/fewshot_{args.corpus}{args.fewnerd_granularity}.json", "r") as f:
@@ -149,7 +149,10 @@ def main(args):
         for seed in range(5):
             flair.set_seed(seed)
             corpus = copy.copy(base_corpus)
-            corpus._train = Subset(base_corpus._train, fewshot_indices[f"{k}-{seed}"])
+            if k != 0:
+                corpus._train = Subset(base_corpus._train, fewshot_indices[f"{k}-{seed}"])
+            else:
+                pass
             corpus._dev = Subset(base_corpus._train, [])
 
             tag_type = "ner"
@@ -179,25 +182,39 @@ def main(args):
             trained_model.linear = classification_head
 
             # 6. initialize trainer
-            trainer = ModelTrainer(trained_model, corpus)
+            if k > 0:
+                trainer = ModelTrainer(trained_model, corpus)
 
-            save_path = save_base_path / f"{k}shot_{seed}"
+                save_path = save_base_path / f"{k}shot_{seed}"
 
-            # 7. run fine-tuning
-            result = trainer.fine_tune(
-                save_path,
-                learning_rate=args.lr,
-                mini_batch_size=args.bs,
-                mini_batch_chunk_size=args.mbs,
-                max_epochs=args.epochs,
-                scheduler=AnnealOnPlateau if args.early_stopping else LinearSchedulerWithWarmup,
-                train_with_dev=args.early_stopping,
-                min_learning_rate=args.min_lr if args.early_stopping else 0.001,
-                save_final_model=False,
-                anneal_factor=args.anneal_factor,
-            )
+                # 7. run fine-tuning
+                result = trainer.fine_tune(
+                    save_path,
+                    learning_rate=args.lr,
+                    mini_batch_size=args.bs,
+                    mini_batch_chunk_size=args.mbs,
+                    max_epochs=args.epochs,
+                    scheduler=AnnealOnPlateau if args.early_stopping else LinearSchedulerWithWarmup,
+                    train_with_dev=args.early_stopping,
+                    min_learning_rate=args.min_lr if args.early_stopping else 0.001,
+                    save_final_model=False,
+                    anneal_factor=args.anneal_factor,
+                )
 
-            results[f"{k}"]["results"].append(result["test_score"])
+                results[f"{k}"]["results"].append(result["test_score"])
+            else:
+                save_path = save_base_path / f"{k}shot_{seed}"
+                import os
+
+                if not os.path.exists(save_path):
+                    os.mkdir(save_path)
+                result = trained_model.evaluate(
+                    corpus.test,
+                    "ner",
+                )
+                results[f"{k}"]["results"].append(result.main_score)
+                with open(save_path / "result.txt", "w") as f:
+                    f.write(result.detailed_results)
 
     def postprocess_scores(scores: dict):
         rounded_scores = [round(float(score) * 100, 2) for score in scores["results"]]

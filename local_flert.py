@@ -16,7 +16,7 @@ def main(args):
 
     save_base_path = Path(
         f"{args.cache_path}/pretrained-flert/"
-        f"{args.transformer}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}/"
+        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}/"
     )
 
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
@@ -29,7 +29,7 @@ def main(args):
         model=args.transformer,
         layers="-1",
         subtoken_pooling="first",
-        fine_tune=True,
+        fine_tune=False,
         use_context=args.use_context,
     )
 
@@ -68,11 +68,11 @@ if __name__ == "__main__":
     parser.add_argument("--cuda_device", type=int, default=2)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--cache_path", type=str, default="/glusterfs/dfs-gfs-dist/goldejon/flair-models")
-    parser.add_argument("--corpus", type=str, default="conll_03")
+    parser.add_argument("--corpus", type=str, default="ontonotes")
     parser.add_argument("--fewnerd_granularity", type=str, default="")
     parser.add_argument("--transformer", type=str, default="bert-base-uncased")
-    parser.add_argument("--use_context", type=bool, default=False)
-    parser.add_argument("--lr", type=float, default=5e-5)
+    parser.add_argument("--use_context", action="store_true")
+    parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--bs", type=int, default=4)
     parser.add_argument("--mbs", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=10)
