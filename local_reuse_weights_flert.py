@@ -61,15 +61,15 @@ def match_exact(trained_model, label_dictionary):
 def match_manual(new_label_dictionary, corpus):
     if corpus == "conll_03":
         matching = {
-            b"O": [0],
-            b"B-person": [1],
-            b"I-person": [2],
-            b"B-location": [3, 19],
-            b"I-location": [4, 20],
-            b"B-miscellaneous": [11, 27],
-            b"I-miscellaneous": [12, 28],
-            b"B-organization": [5, 3],
-            b"I-organization": [6, 4],
+            b"O": [b"O"],
+            b"B-person": [b"B-person"],
+            b"I-person": [b"I-person"],
+            b"B-location": [b"B-location", b"B-geographical social political entity"],
+            b"I-location": [b"I-location", b"I-geographical social political entity"],
+            b"B-miscellaneous": [b"B-nationality religion political", b"B-event"],
+            b"I-miscellaneous": [b"I-nationality religion political", b"I-event"],
+            b"B-organization": [b"B-organization", b"B-location"],
+            b"I-organization": [b"I-organization", b"I-location"],
         }
         matching_ids = {
             new_label_dictionary.item2idx[key]: matching[key]
@@ -78,19 +78,19 @@ def match_manual(new_label_dictionary, corpus):
         }
     elif corpus == "wnut_17":
         matching = {
-            b"O": [0],
-            b"B-person": [1],
-            b"I-person": [2],
-            b"B-location": [3, 19, 25],
-            b"I-location": [4, 20, 26],
-            b"B-creative work": [23],
-            b"I-creative work": [24],
-            b"B-group": [11],
-            b"I-group": [12],
-            b"B-corporation": [5],
-            b"I-corporation": [6],
-            b"B-product": [31],
-            b"I-product": [32],
+            b"O": [b"O"],
+            b"B-person": [b"B-person"],
+            b"I-person": [b"I-person"],
+            b"B-location": [b"B-location", b"B-facility", b"B-geographical social political entity"],
+            b"I-location": [b"I-location", b"I-facility", b"I-geographical social political entity"],
+            b"B-creative work": [b"B-work of art"],
+            b"I-creative work": [b"I-work of art"],
+            b"B-group": [b"B-nationality religion political"],
+            b"I-group": [b"I-nationality religion political"],
+            b"B-corporation": [b"B-organization"],
+            b"I-corporation": [b"I-organization"],
+            b"B-product": [b"B-product"],
+            b"I-product": [b"I-product"],
         }
         matching_ids = {
             new_label_dictionary.item2idx[key]: matching[key]
@@ -109,7 +109,11 @@ def reuse_classification_head(trained_model, matching_mode, new_label_dictionary
         if matching_mode == "exact":
             matching_ids = match_exact(trained_model, new_label_dictionary)
         elif matching_mode == "manual":
-            matching_ids = match_manual(new_label_dictionary, corpus_name)
+            _matching_ids = match_manual(new_label_dictionary, corpus_name)
+            matching_ids = {
+                key: [trained_model.label_dictionary.item2idx[val] for val in vals]
+                for key, vals in _matching_ids.items()
+            }
         else:
             raise Exception()
 
