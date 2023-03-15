@@ -104,14 +104,7 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
         logits = torch.mm(token_embedding_tensor, torch.stack(label_tensor).T)
 
         # for loss computation, get the gold labels
-        gold_label_tensor = torch.tensor(
-            [
-                self.label_dictionary.get_idx_for_item(label)
-                for sentence in self._get_gold_labels(sentences)
-                for label in sentence
-            ],
-            device=flair.device,
-        )
+        gold_label_tensor = self._prepare_label_tensor(sentences)
 
         # compute loss
         loss = self.loss_fct(logits, gold_label_tensor)
@@ -276,6 +269,16 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
             labels = [[token.get_label(self.label_type, "O").value for token in sentence] for sentence in sentences]
 
         return labels
+
+    def _prepare_label_tensor(self, sentences):
+        return torch.tensor(
+            [
+                self.label_dictionary.get_idx_for_item(label)
+                for sentence in self._get_gold_labels(sentences)
+                for label in sentence
+            ],
+            device=flair.device,
+        )
 
     def _print_predictions(self, batch, gold_label_type):
         lines = []
