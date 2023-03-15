@@ -97,7 +97,6 @@ if __name__ == "__main__":
     parser.add_argument("--tag_format", type=str, default="BIO")
     parser.add_argument("--pretrained_model_path", type=str)
     parser.add_argument("--pretrained_on", type=str)
-    parser.add_argument("--matching_mode", type=str, default="")
     parser.add_argument("--fewnerd_granularity", type=str, default="")
     parser.add_argument("--k", type=int, default=1, nargs="+")
     parser.add_argument("--transformer", type=str, default="bert-base-uncased")
