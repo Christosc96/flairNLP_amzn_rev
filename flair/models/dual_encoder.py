@@ -85,7 +85,7 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
     def label_type(self):
         return self.tag_type
 
-    def forward(self, sentences, inference):
+    def forward(self, sentences, inference, return_features):
         # embed sentences
         self.token_encoder.embed(sentences)
 
@@ -117,7 +117,7 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
         loss = self.loss_fct(logits, gold_label_tensor)
 
         # if doing inference, return loss and predictions
-        if inference:
+        if inference and return_features:
             # do softmax + argmax
             scores, preds = torch.max(torch.nn.functional.softmax(logits, dim=-1), dim=-1)
 
@@ -142,9 +142,11 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
                 for sentence_preds, sentence_scores in zip(preds, scores)
             ]
 
-            return loss, decoded_predictions
+            return loss, decoded_predictions, logits
 
         # otherwise just return the loss
+        elif return_features:
+            return loss, logits
         else:
             return loss
 
@@ -152,7 +154,7 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
         if len(sentences) == 0:
             return torch.tensor(0.0, dtype=torch.float, device=flair.device, requires_grad=True), 0
 
-        loss = self.forward(sentences, inference=False)
+        loss = self.forward(sentences, inference=False, return_features=False)
 
         return loss, sum([len(s) for s in sentences])
 
@@ -212,7 +214,7 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
                 for sentence in batch:
                     sentence.remove_labels(label_name)
 
-                loss, preds = self.forward(batch, inference=True)
+                loss, preds = self.forward(batch, inference=True, return_features=False)
 
                 # if return_loss, get loss value
                 if return_loss:
