@@ -164,6 +164,9 @@ def main(args):
 
             # 4. initialize fine-tuneable transformer embeddings WITH document context
             trained_model = SequenceTagger.load(args.pretrained_model_path)
+            if not trained_model.embeddings.fine_tune:
+                trained_model.embeddings.fine_tune = True
+                trained_model.embeddings.static_embeddings = False
 
             if args.use_crf:
                 if not new_label_dictionary.start_stop_tags_are_set():
