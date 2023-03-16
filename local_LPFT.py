@@ -16,7 +16,7 @@ def frozen_pretraining(args):
 
     save_base_path = Path(
         f"{args.cache_path}/pretrained-flert/"
-        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.frozen_lr}-{args.finetuning_lr}_{args.seed}_LPFT/frozen_pretraining"
+        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.frozen_lr}-{args.finetuning_lr}_{args.seed}_LPFT{args.suffix}/frozen_pretraining"
     )
 
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
@@ -68,7 +68,7 @@ def finetuning(args):
 
     save_base_path = Path(
         f"{args.cache_path}/pretrained-flert/"
-        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.frozen_lr}-{args.finetuning_lr}_{args.seed}_LPFT"
+        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.frozen_lr}-{args.finetuning_lr}_{args.seed}_LPFT{args.suffix}"
     )
 
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
@@ -103,6 +103,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda_device", type=int, default=2)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--cache_path", type=str, default="/glusterfs/dfs-gfs-dist/goldejon/flair-models")
+    parser.add_argument("--suffix", type=str, default="")
     parser.add_argument("--pretrained_model_path", type=str)
     parser.add_argument("--corpus", type=str, default="ontonotes")
     parser.add_argument("--fewnerd_granularity", type=str, default="")
