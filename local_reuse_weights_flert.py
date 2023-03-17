@@ -247,7 +247,7 @@ def main(args):
                     mini_batch_size=args.bs,
                     mini_batch_chunk_size=args.mbs,
                     max_epochs=args.epochs,
-                    optimizer=optimizer if args.custom_optimzier else torch.optim.Adam,
+                    optimizer=optimizer if args.custom_optimizer else torch.optim.Adam,
                     scheduler=AnnealOnPlateau if args.early_stopping else LinearSchedulerWithWarmup,
                     train_with_dev=args.early_stopping,
                     min_learning_rate=args.min_lr if args.early_stopping else 0.001,
