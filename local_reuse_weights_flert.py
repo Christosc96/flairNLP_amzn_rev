@@ -164,7 +164,10 @@ def main(args):
 
             # 4. initialize fine-tuneable transformer embeddings WITH document context
             trained_model = SequenceTagger.load(args.pretrained_model_path)
-            if not trained_model.embeddings.fine_tune:
+            if args.freeze_embeddings:
+                trained_model.embeddings.fine_tune = False
+                trained_model.embeddings.static_embeddings = True
+            else:
                 trained_model.embeddings.fine_tune = True
                 trained_model.embeddings.static_embeddings = False
 
@@ -240,6 +243,7 @@ if __name__ == "__main__":
     parser.add_argument("--corpus", type=str, default="conll_03")
     parser.add_argument("--tag_format", type=str, default="BIO")
     parser.add_argument("--pretrained_model_path", type=str)
+    parser.add_argument("--freeze_embeddings", action="store_true")
     parser.add_argument("--pretrained_on", type=str)
     parser.add_argument("--matching_mode", type=str, default="")
     parser.add_argument("--fewnerd_granularity", type=str, default="")

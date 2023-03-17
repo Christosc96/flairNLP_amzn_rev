@@ -99,7 +99,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--do_frozen_pretraining", action="store_true")
     parser.add_argument("--do_finetuning", action="store_true")
-    parser.add_argument("--cuda", type=bool, default=True)
+    parser.add_argument("--cuda", action="store_false")
     parser.add_argument("--cuda_device", type=int, default=2)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--cache_path", type=str, default="/glusterfs/dfs-gfs-dist/goldejon/flair-models")
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--bs", type=int, default=4)
     parser.add_argument("--mbs", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--early_stopping", type=bool, default=False)
+    parser.add_argument("--early_stopping", action="store_true")
     parser.add_argument("--min_lr", type=float, default=5e-7)
     args = parser.parse_args()
     if args.do_frozen_pretraining:
