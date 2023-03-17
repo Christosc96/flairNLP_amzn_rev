@@ -139,7 +139,15 @@ def main(args):
 
     save_base_path = Path(
         f"{args.cache_path}/reuse-weights-flert/"
-        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}_{args.pretrained_on}/"
+        f"{args.transformer}{'-context' if args.use_context else ''}_"
+        f"{args.corpus}{args.fewnerd_granularity}_"
+        f"{args.lr}_{args.seed}_"
+        f"{args.pretrained_on}"
+        f"{'_early-stopping' if args.early_stopping else ''}"
+        f"{f'_{args.matching_mode}-matching' if args.matching_mode else ''}"
+        f"{f'_frozen-embeddings' if args.freeze_embeddings else ''}"
+        f"{f'_custom-optimizer' if args.custom_optimizer else ''}"
+        f"{f'_crf' if args.use_crf else ''}/"
     )
 
     with open(f"data/fewshot/fewshot_{args.corpus}{args.fewnerd_granularity}.json", "r") as f:
@@ -191,6 +199,41 @@ def main(args):
             trained_model.tagset_size = len(new_label_dictionary) if not args.use_crf else len(new_label_dictionary) + 2
             trained_model.linear = classification_head
 
+            if args.custom_optimizer:
+                layer_names = []
+                for idx, (name, param) in enumerate(trained_model.named_parameters()):
+                    layer_names.append(name)
+
+                lr_min = args.min_lr
+                lr_max = args.lr
+                args.early_stopping = False
+                lr_group_names = (
+                    ["embeddings.model.embeddings"]
+                    + [f"embeddings.model.encoder.layer.{idx}" for idx in range(12)]
+                    + ["embeddings.model.pooler", "linear"]
+                )
+                lr_groups = np.arange(lr_min, lr_max, (lr_max - lr_min) / len(lr_group_names))
+
+                # placeholder
+                parameters = []
+
+                # store params & learning rates
+                for idx, name in enumerate(layer_names):
+                    # display info
+                    for group_name in lr_group_names:
+                        if name.startswith(group_name):
+                            lr = lr_groups[lr_group_names.index(group_name)]
+
+                    # append layer parameters
+                    parameters += [
+                        {
+                            "params": [p for n, p in trained_model.named_parameters() if n == name and p.requires_grad],
+                            "lr": lr,
+                        }
+                    ]
+
+                optimizer = torch.optim.Adam(parameters)
+
             # 6. initialize trainer
             if k > 0:
                 trainer = ModelTrainer(trained_model, corpus)
@@ -204,6 +247,7 @@ def main(args):
                     mini_batch_size=args.bs,
                     mini_batch_chunk_size=args.mbs,
                     max_epochs=args.epochs,
+                    optimizer=optimizer if args.custom_optimzier else torch.optim.Adam,
                     scheduler=AnnealOnPlateau if args.early_stopping else LinearSchedulerWithWarmup,
                     train_with_dev=args.early_stopping,
                     min_learning_rate=args.min_lr if args.early_stopping else 0.001,
@@ -255,6 +299,7 @@ if __name__ == "__main__":
     parser.add_argument("--mbs", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--early_stopping", action="store_true")
+    parser.add_argument("--custom_optimizer", action="store_true")
     parser.add_argument("--min_lr", type=float, default=5e-7)
     parser.add_argument("--anneal_factor", type=float, default=0.5)
     parser.add_argument("--use_crf", action="store_true")
