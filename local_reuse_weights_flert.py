@@ -146,6 +146,7 @@ def main(args):
         f"{'_early-stopping' if args.early_stopping else ''}"
         f"{f'_{args.matching_mode}-matching' if args.matching_mode else ''}"
         f"{f'_frozen-embeddings' if args.freeze_embeddings else ''}"
+        f"{f'_decoder-lr-{args.lr * args.decoder_lr_factor}' if args.decoder_lr_factor != 1.0 else ''}"
         f"{f'_custom-optimizer' if args.custom_optimizer else ''}"
         f"{f'_crf' if args.use_crf else ''}/"
     )
@@ -253,6 +254,7 @@ def main(args):
                     min_learning_rate=args.min_lr if args.early_stopping else 0.001,
                     save_final_model=False,
                     anneal_factor=args.anneal_factor,
+                    decoder_lr_factor=args.decoder_lr_factor,
                 )
 
                 results[f"{k}"]["results"].append(result["test_score"])
@@ -302,6 +304,7 @@ if __name__ == "__main__":
     parser.add_argument("--custom_optimizer", action="store_true")
     parser.add_argument("--min_lr", type=float, default=5e-7)
     parser.add_argument("--anneal_factor", type=float, default=0.5)
+    parser.add_argument("--decoder_lr_factor", type=float, default=1.0)
     parser.add_argument("--use_crf", action="store_true")
     args = parser.parse_args()
     main(args)
