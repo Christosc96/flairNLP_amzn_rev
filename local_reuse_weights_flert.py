@@ -44,7 +44,12 @@ def bio_label_dictionary(corpus, tag_format, tag_type):
 
 
 def random_initialized_classification_head(trained_model, label_dictionary):
-    return torch.nn.Linear(trained_model.linear.in_features, len(label_dictionary), device=flair.device)
+    return torch.nn.Linear(
+        trained_model.linear.in_features,
+        len(label_dictionary),
+        bias=True if trained_model.linear.bias is not None else False,
+        device=flair.device,
+    )
 
 
 def match_exact(trained_model, label_dictionary):
@@ -120,15 +125,18 @@ def reuse_classification_head(trained_model, matching_mode, new_label_dictionary
         for new_idx, matching_idx in matching_ids.items():
             if len(matching_idx) > 1:
                 weights_to_reuse = trained_model.linear.weight[matching_idx].mean(dim=0)
-                bias_to_reuse = trained_model.linear.bias[matching_idx].mean(dim=0)
+                if trained_model.linear.bias is not None:
+                    bias_to_reuse = trained_model.linear.bias[matching_idx].mean(dim=0)
             elif len(matching_idx) == 1:
                 weights_to_reuse = trained_model.linear.weight[matching_idx].squeeze()
-                bias_to_reuse = trained_model.linear.bias[matching_idx].squeeze()
+                if trained_model.linear.bias is not None:
+                    bias_to_reuse = trained_model.linear.bias[matching_idx].squeeze()
             else:
                 continue
 
             new_classification_head.weight[new_idx] = weights_to_reuse
-            new_classification_head.bias[new_idx] = bias_to_reuse
+            if trained_model.linear.bias is not None:
+                new_classification_head.bias[new_idx] = bias_to_reuse
 
     return new_classification_head
 

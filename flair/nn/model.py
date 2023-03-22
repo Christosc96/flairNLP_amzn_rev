@@ -88,6 +88,9 @@ class Model(torch.nn.Module, typing.Generic[DT], ABC):
 
         model = cls(**kwargs)
 
+        if state["state_dict"].get("linear.bias") is None:
+            model.linear = torch.nn.Linear(model.linear.in_features, model.linear.out_features, bias=False)
+
         model.load_state_dict(state["state_dict"])
 
         return model
