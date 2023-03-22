@@ -149,7 +149,7 @@ def main(args):
         f"{args.cache_path}/reuse-weights-flert/"
         f"{args.transformer}{'-context' if args.use_context else ''}_"
         f"{args.corpus}{args.fewnerd_granularity}_"
-        f"{'%.e' % args.lr}_{args.seed}_"
+        f"{args.lr}_{args.seed}_"
         f"{args.pretrained_on}"
         f"{'_early-stopping' if args.early_stopping else ''}"
         f"{f'_{args.matching_mode}-matching' if args.matching_mode else ''}"
@@ -267,12 +267,12 @@ if __name__ == "__main__":
     parser.add_argument("--k", type=int, default=1, nargs="+")
     parser.add_argument("--transformer", type=str, default="bert-base-uncased")
     parser.add_argument("--use_context", action="store_true")
-    parser.add_argument("--lr", type=float, default=5e-5)
+    parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--bs", type=int, default=4)
     parser.add_argument("--mbs", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--early_stopping", action="store_true")
-    parser.add_argument("--min_lr", type=float, default=5e-7)
+    parser.add_argument("--min_lr", type=float, default=1e-7)
     parser.add_argument("--anneal_factor", type=float, default=0.5)
     parser.add_argument("--decoder_lr_factor", type=float, default=1.0)
     parser.add_argument("--use_crf", action="store_true")

@@ -88,7 +88,7 @@ def finetuning(args):
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
 
     # 4. initialize fine-tuneable transformer embeddings WITH document context
-    tagger = SequenceTagger.load(save_base_path / "frozen_pretraining" / "final-model.pt", strict=False)
+    tagger = SequenceTagger.load(save_base_path / "frozen_pretraining" / "final-model.pt")
     tagger.embeddings.fine_tune = True
     tagger.embeddings.static_embeddings = False
 
