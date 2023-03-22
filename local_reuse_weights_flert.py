@@ -113,7 +113,7 @@ def reuse_classification_head(trained_model, matching_mode, new_label_dictionary
     with torch.no_grad():
         if matching_mode == "exact":
             matching_ids = match_exact(trained_model, new_label_dictionary)
-        elif matching_mode == "manual":
+        elif matching_mode == "compose":
             _matching_ids = match_manual(new_label_dictionary, corpus_name)
             matching_ids = {
                 key: [trained_model.label_dictionary.item2idx[val] for val in vals]
@@ -155,7 +155,6 @@ def main(args):
         f"{f'_{args.matching_mode}-matching' if args.matching_mode else ''}"
         f"{f'_frozen-embeddings' if args.freeze_embeddings else ''}"
         f"{f'_decoder-lr-{args.lr * args.decoder_lr_factor}' if args.decoder_lr_factor != 1.0 else ''}"
-        f"{f'_custom-optimizer' if args.custom_optimizer else ''}"
         f"{f'_crf' if args.use_crf else ''}/"
     )
 
@@ -208,41 +207,6 @@ def main(args):
             trained_model.tagset_size = len(new_label_dictionary) if not args.use_crf else len(new_label_dictionary) + 2
             trained_model.linear = classification_head
 
-            if args.custom_optimizer:
-                layer_names = []
-                for idx, (name, param) in enumerate(trained_model.named_parameters()):
-                    layer_names.append(name)
-
-                lr_min = args.min_lr
-                lr_max = args.lr
-                args.early_stopping = False
-                lr_group_names = (
-                    ["embeddings.model.embeddings"]
-                    + [f"embeddings.model.encoder.layer.{idx}" for idx in range(12)]
-                    + ["embeddings.model.pooler", "linear"]
-                )
-                lr_groups = np.arange(lr_min, lr_max, (lr_max - lr_min) / len(lr_group_names))
-
-                # placeholder
-                parameters = []
-
-                # store params & learning rates
-                for idx, name in enumerate(layer_names):
-                    # display info
-                    for group_name in lr_group_names:
-                        if name.startswith(group_name):
-                            lr = lr_groups[lr_group_names.index(group_name)]
-
-                    # append layer parameters
-                    parameters += [
-                        {
-                            "params": [p for n, p in trained_model.named_parameters() if n == name and p.requires_grad],
-                            "lr": lr,
-                        }
-                    ]
-
-                optimizer = torch.optim.Adam(parameters)
-
             # 6. initialize trainer
             if k > 0:
                 trainer = ModelTrainer(trained_model, corpus)
@@ -256,7 +220,6 @@ def main(args):
                     mini_batch_size=args.bs,
                     mini_batch_chunk_size=args.mbs,
                     max_epochs=args.epochs,
-                    optimizer=optimizer if args.custom_optimizer else torch.optim.Adam,
                     scheduler=AnnealOnPlateau if args.early_stopping else LinearSchedulerWithWarmup,
                     train_with_dev=args.early_stopping,
                     min_learning_rate=args.min_lr if args.early_stopping else 0.001,
@@ -309,7 +272,6 @@ if __name__ == "__main__":
     parser.add_argument("--mbs", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--early_stopping", action="store_true")
-    parser.add_argument("--custom_optimizer", action="store_true")
     parser.add_argument("--min_lr", type=float, default=5e-7)
     parser.add_argument("--anneal_factor", type=float, default=0.5)
     parser.add_argument("--decoder_lr_factor", type=float, default=1.0)
