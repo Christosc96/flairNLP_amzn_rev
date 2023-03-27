@@ -20,7 +20,7 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
     def __init__(
         self,
         token_encoder: TokenEmbeddings,
-        label_encoder: DocumentEmbeddings,
+        label_encoder: Union[DocumentEmbeddings, TokenEmbeddings],
         tag_dictionary: Dictionary,
         tag_type: str,
         tag_format: str = "BIO",
@@ -36,6 +36,11 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
         # ----- Embeddings -----
         self.token_encoder = token_encoder
         self.label_encoder = label_encoder
+        if self.label_encoder.embedding_type == "word-level":
+            self.label_linear = torch.nn.Linear(
+                self.label_encoder.embedding_length, self.token_encoder.embedding_length, device=flair.device
+            )
+
         self.use_dropout: float = dropout
 
         if dropout > 0.0:
@@ -98,10 +103,18 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
         # embed the verbalized labels to make a label tensor
         verbalized_labels = list(map(Sentence, self.idx2verbalized_label.values()))
         self.label_encoder.embed(verbalized_labels)
-        label_tensor = [label.get_embedding() for label in verbalized_labels]
+        if self.label_encoder.embedding_type == "sentence-level":
+            label_tensor = torch.stack([label.get_embedding() for label in verbalized_labels])
+        elif self.label_encoder.embedding_type == "word-level":
+            label_tensor = torch.stack(
+                [torch.max(torch.stack([t.get_embedding() for t in vb]), dim=0).values for vb in verbalized_labels]
+            )
+            label_tensor = self.label_linear(label_tensor)
+        else:
+            raise Exception("Unknown embedding type.")
 
         # do the dot product to calculate the logits
-        logits = torch.mm(token_embedding_tensor, torch.stack(label_tensor).T)
+        logits = torch.mm(token_embedding_tensor, label_tensor.T)
 
         # for loss computation, get the gold labels
         gold_label_tensor = self._prepare_label_tensor(sentences)
@@ -110,7 +123,7 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
         loss = self.loss_fct(logits, gold_label_tensor)
 
         # if doing inference, return loss and predictions
-        if inference and return_features:
+        if inference:
             # do softmax + argmax
             scores, preds = torch.max(torch.nn.functional.softmax(logits, dim=-1), dim=-1)
 
@@ -135,13 +148,17 @@ class DualEncoder(flair.nn.Classifier[Sentence]):
                 for sentence_preds, sentence_scores in zip(preds, scores)
             ]
 
-            return loss, decoded_predictions, logits
+            if return_features:
+                return loss, decoded_predictions, logits
+            else:
+                return loss, decoded_predictions
 
         # otherwise just return the loss
-        elif return_features:
-            return loss, logits
         else:
-            return loss
+            if return_features:
+                return loss, logits
+            else:
+                return loss
 
     def forward_loss(self, sentences: List[Sentence]) -> Tuple[torch.Tensor, int]:
         if len(sentences) == 0:

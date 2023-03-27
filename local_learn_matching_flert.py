@@ -71,7 +71,6 @@ def get_representations_for_support_set(
                         reps.append(_token.get_embedding())
 
             elif representation == "features":
-                _sentences = sorted(_sentences, key=len, reverse=True)
                 sentence_tensor, lengths = trained_model._prepare_tensors(_sentences)
                 reps.extend(trained_model.forward(sentence_tensor, lengths))
 
@@ -101,6 +100,17 @@ def get_representations_for_support_set(
     return reps_per_label
 
 
+def exact_matching(trained_model: flair.nn.Model, label_dictionary: flair.data.Dictionary):
+    with torch.no_grad():
+        fc = new_classfier(trained_model, label_dictionary)
+        for idx, label in enumerate(label_dictionary.idx2item):
+            if label in trained_model.label_dictionary.item2idx.keys():
+                fc.weight[idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
+                fc.bias[idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
+
+    return fc
+
+
 def mixture_similarity(
     trained_model: flair.nn.Model,
     corpus: flair.data.Corpus,
@@ -127,7 +137,7 @@ def mixture_similarity(
 
             elif label in trained_model.label_dictionary.item2idx.keys():
                 fc.weight[label_idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
-                fc.bias[label_idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
+                fc.bias[label_idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
 
             else:
                 # use the random init weight
@@ -152,7 +162,7 @@ def mixture_softmax(trained_model: flair.nn.Model, corpus: flair.data.Corpus, la
             # Fallback option: if the label is not present at all in the support set, check if there is a label that has the same name
             elif label in trained_model.label_dictionary.item2idx.keys():
                 fc.weight[label_idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
-                fc.bias[label_idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
+                fc.bias[label_idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
 
             else:
                 # use the random init weight
@@ -197,6 +207,8 @@ def adapt_fc(trained_model: flair.nn.Model, corpus: flair.data.Corpus, args: arg
             fc = mixture_softmax(trained_model, corpus, new_label_dictionary)
         elif args.init_method == "mean-std":
             fc = mean_std_of_data(trained_model, corpus, new_label_dictionary, args.representation)
+        elif args.init_method == "exact-matching":
+            fc = exact_matching(trained_model, new_label_dictionary)
         else:
             raise Exception(f"Unknown init method: {args.init_method}")
     else:

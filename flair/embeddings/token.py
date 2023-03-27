@@ -186,7 +186,7 @@ class WordEmbeddings(TokenEmbeddings):
         if embeddings_path is not None:
             if embeddings_path.suffix in [".bin", ".txt"]:
                 precomputed_word_embeddings = gensim.models.KeyedVectors.load_word2vec_format(
-                    str(embeddings_path), binary=embeddings_path.suffix == ".bin"
+                    str(embeddings_path), binary=embeddings_path.suffix == ".bin", no_header=True
                 )
             else:
                 precomputed_word_embeddings = gensim.models.KeyedVectors.load(str(embeddings_path))
