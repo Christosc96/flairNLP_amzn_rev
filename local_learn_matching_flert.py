@@ -378,6 +378,7 @@ def train(args):
         f"{f'-{args.similarity_norm}' if args.init_method == 'mixture-similarity' else ''}"
         f"{f'-clip-vals' if args.init_method == 'mixture-similarity' and args.similarity_clip_vals else ''}"
         f"{'_early-stopping' if args.early_stopping else ''}"
+        f"{'_contrastive-pretraining' if args.contrastive_pretraining else ''}"
         f"{f'_frozen-embeddings' if args.freeze_embeddings else ''}"
         f"{f'_decoder-lr-{args.lr * args.decoder_lr_factor}' if args.decoder_lr_factor != 1.0 else ''}"
     )
