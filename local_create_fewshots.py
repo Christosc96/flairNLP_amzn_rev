@@ -1,4 +1,5 @@
 import json
+import os
 
 from torch.utils.data.dataset import Subset
 
@@ -10,6 +11,8 @@ def main():
     Each function saves a json-file under data/fewshot/ in the format fewshot_datsetname.json,
     containing a list of IDs for K~2K sampling.
     """
+    if not os.path.exists("data/fewshot"):
+        os.mkdir("data/fewshot")
     conll()
     wnut()
     ontonotes()
