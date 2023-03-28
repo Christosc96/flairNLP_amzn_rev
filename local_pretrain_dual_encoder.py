@@ -18,9 +18,9 @@ def main(args):
 
     save_base_path = Path(
         f"{args.cache_path}/pretrained-dual-encoder/"
-        f"{args.transformer if args.label_encoder == 'transformer' else 'glove'}_"
-        f"{args.corpus}{args.fewnerd_granularity}_"
-        f"{args.lr}_{args.seed}"
+        f"{args.transformer if args.label_encoder == 'transformer' else 'glove'}"
+        f"_{args.corpus}{args.fewnerd_granularity}_"
+        f"_{args.lr}-{args.seed}"
         f"{'_freeze-label-encoder' if args.freeze_label_encoder else ''}"
     )
 

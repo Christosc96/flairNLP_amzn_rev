@@ -2,10 +2,14 @@ import json
 
 from torch.utils.data.dataset import Subset
 
-from flair.datasets import CONLL_03, FEWNERD, ONTONOTES, WNUT_17
+from local_corpora import get_corpus
 
 
 def main():
+    """
+    Each function saves a json-file under data/fewshot/ in the format fewshot_datsetname.json,
+    containing a list of IDs for K~2K sampling.
+    """
     conll()
     wnut()
     ontonotes()
@@ -15,7 +19,7 @@ def main():
 
 def conll():
     conll_indices = {}
-    conll = CONLL_03(base_path="data")
+    conll = get_corpus("conll_03", "")
 
     no_docstarts = []
     for idx, sentence in enumerate(conll.train):
@@ -41,7 +45,7 @@ def conll():
 
 def wnut():
     wnut_indices = {}
-    wnut = WNUT_17()
+    wnut = get_corpus("wnut_17", "")
 
     tag_type = "ner"
     label_dict = wnut.make_label_dictionary(tag_type, add_unk=False)
@@ -59,7 +63,7 @@ def wnut():
 
 def ontonotes():
     ontonotes_indices = {}
-    ontonotes = ONTONOTES()
+    ontonotes = get_corpus("ontonotes", "")
 
     tag_type = "ner"
     label_dict = ontonotes.make_label_dictionary(tag_type, add_unk=False)
@@ -77,76 +81,7 @@ def ontonotes():
 
 def fewnerd_coarse():
     fewnerd_indices = {}
-    fewnerd = FEWNERD(
-        label_name_map={
-            "location-GPE": "location",
-            "person-other": "person",
-            "organization-other": "organization",
-            "organization-company": "organization",
-            "person-artist/author": "person",
-            "person-athlete": "person",
-            "person-politician": "person",
-            "building-other": "building",
-            "organization-sportsteam": "organization",
-            "organization-education": "organization",
-            "location-other": "location",
-            "other-biologything": "other",
-            "location-road/railway/highway/transit": "location",
-            "person-actor": "person",
-            "product-other": "product",
-            "event-sportsevent": "event",
-            "organization-government/governmentagency": "organization",
-            "location-bodiesofwater": "location",
-            "organization-media/newspaper": "organization",
-            "art-music": "art",
-            "other-chemicalthing": "other",
-            "event-attack/battle/war/militaryconflict": "event",
-            "organization-politicalparty": "organization",
-            "art-writtenart": "art",
-            "other-award": "other",
-            "other-livingthing": "other",
-            "event-other": "event",
-            "art-film": "art",
-            "product-software": "product",
-            "organization-sportsleague": "organization",
-            "other-language": "other",
-            "other-disease": "other",
-            "organization-showorganization": "organization",
-            "product-airplane": "product",
-            "other-astronomything": "other",
-            "organization-religion": "organization",
-            "product-car": "product",
-            "person-scholar": "person",
-            "other-currency": "other",
-            "person-soldier": "person",
-            "location-mountain": "location",
-            "art-broadcastprogram": "art",
-            "location-island": "location",
-            "art-other": "art",
-            "person-director": "person",
-            "product-weapon": "product",
-            "other-god": "other",
-            "building-theater": "building",
-            "other-law": "other",
-            "product-food": "product",
-            "other-medical": "other",
-            "product-game": "product",
-            "location-park": "location",
-            "product-ship": "product",
-            "building-sportsfacility": "building",
-            "other-educationaldegree": "other",
-            "building-airport": "building",
-            "building-hospital": "building",
-            "product-train": "product",
-            "building-library": "building",
-            "building-hotel": "building",
-            "building-restaurant": "building",
-            "event-disaster": "event",
-            "event-election": "event",
-            "event-protest": "event",
-            "art-painting": "art",
-        }
-    )
+    fewnerd = get_corpus("fewnerd", "coarse")
 
     tag_type = "ner"
     label_dict = fewnerd.make_label_dictionary(tag_type, add_unk=False)
@@ -164,76 +99,7 @@ def fewnerd_coarse():
 
 def fewnerd_fine():
     fewnerd_indices = {}
-    fewnerd = FEWNERD(
-        label_name_map={
-            "location-GPE": "geographical social political entity",
-            "person-other": "other person",
-            "organization-other": "other organization",
-            "organization-company": "company",
-            "person-artist/author": "author artist",
-            "person-athlete": "athlete",
-            "person-politician": "politician",
-            "building-other": "other building",
-            "organization-sportsteam": "sportsteam",
-            "organization-education": "eduction",
-            "location-other": "other location",
-            "other-biologything": "biology",
-            "location-road/railway/highway/transit": "road railway highway transit",
-            "person-actor": "actor",
-            "product-other": "other product",
-            "event-sportsevent": "sportsevent",
-            "organization-government/governmentagency": "government agency",
-            "location-bodiesofwater": "bodies of water",
-            "organization-media/newspaper": "media newspaper",
-            "art-music": "music",
-            "other-chemicalthing": "chemical",
-            "event-attack/battle/war/militaryconflict": "attack war battle military conflict",
-            "organization-politicalparty": "political party",
-            "art-writtenart": "written art",
-            "other-award": "award",
-            "other-livingthing": "living thing",
-            "event-other": "other event",
-            "art-film": "film",
-            "product-software": "software",
-            "organization-sportsleague": "sportsleague",
-            "other-language": "language",
-            "other-disease": "disease",
-            "organization-showorganization": "show organization",
-            "product-airplane": "airplane",
-            "other-astronomything": "astronomy",
-            "organization-religion": "religion",
-            "product-car": "car",
-            "person-scholar": "scholar",
-            "other-currency": "currency",
-            "person-soldier": "soldier",
-            "location-mountain": "mountain",
-            "art-broadcastprogram": "broadcastprogram",
-            "location-island": "island",
-            "art-other": "other art",
-            "person-director": "director",
-            "product-weapon": "weapon",
-            "other-god": "god",
-            "building-theater": "theater",
-            "other-law": "law",
-            "product-food": "food",
-            "other-medical": "medical",
-            "product-game": "game",
-            "location-park": "park",
-            "product-ship": "ship",
-            "building-sportsfacility": "sportsfacility",
-            "other-educationaldegree": "educational degree",
-            "building-airport": "airport",
-            "building-hospital": "hospital",
-            "product-train": "train",
-            "building-library": "library",
-            "building-hotel": "hotel",
-            "building-restaurant": "restaurant",
-            "event-disaster": "disaster",
-            "event-election": "election",
-            "event-protest": "protest",
-            "art-painting": "painting",
-        }
-    )
+    fewnerd = get_corpus("fewnerd", "fine")
 
     tag_type = "ner"
     label_dict = fewnerd.make_label_dictionary(tag_type, add_unk=False)

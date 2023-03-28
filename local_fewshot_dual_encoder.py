@@ -15,12 +15,16 @@ from local_corpora import get_corpus
 
 
 def main(args):
-    if args.cuda:
+    if not args.cpu:
         flair.device = f"cuda:{args.cuda_device}"
 
     save_base_path = Path(
         f"{args.cache_path}/fewshot-dual-encoder/"
-        f"{args.transformer}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}_{args.pretrained_on}/"
+        f"{args.transformer}_"
+        f"{args.corpus}{args.fewnerd_granularity}_"
+        f"{args.lr}-{args.seed}"
+        f"_{args.pretrained_on}"
+        f"{'_early-stopping' if args.early_stopping else ''}"
     )
 
     with open(f"data/fewshot/fewshot_{args.corpus}{args.fewnerd_granularity}.json", "r") as f:
@@ -89,7 +93,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cuda", type=bool, default=True)
+    parser.add_argument("--cpu", action="store_true")
     parser.add_argument("--cuda_device", type=int, default=2)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--cache_path", type=str, default="/glusterfs/dfs-gfs-dist/goldejon/flair-models")
@@ -108,6 +112,5 @@ if __name__ == "__main__":
     parser.add_argument("--early_stopping", action="store_true")
     parser.add_argument("--min_lr", type=float, default=1e-7)
     parser.add_argument("--anneal_factor", type=float, default=0.5)
-    parser.add_argument("--use_crf", action="store_true")
     args = parser.parse_args()
     main(args)

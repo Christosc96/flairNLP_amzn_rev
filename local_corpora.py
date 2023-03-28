@@ -3,7 +3,11 @@ from torch.utils.data.dataset import Subset
 from flair.datasets import CONLL_03, FEWNERD, ONTONOTES, WNUT_17
 
 
-def get_corpus(corpus: str, fewnerd_granularity: str):
+def get_corpus(corpus: str, fewnerd_granularity: str = ""):
+    """
+    corpus: str = either 'wnut_17', 'conll_03', 'ontonotes', 'fewnerd'
+    fewnerd_granularity: str = if corpus == 'fewnerd', fewnerd_granularity can either bei 'fine', 'coarse' or 'coarse-fine'
+    """
     if corpus == "wnut_17":
         return WNUT_17(
             label_name_map={
@@ -22,6 +26,7 @@ def get_corpus(corpus: str, fewnerd_granularity: str):
             label_name_map={"PER": "person", "LOC": "location", "ORG": "organization", "MISC": "miscellaneous"},
         )
         valid_indices = []
+        # We need to filter them out in order to ensure we use the same IDs from the corpora as on HF datasets
         for idx, sentence in enumerate(dataset.train):
             if "DOCSTART" not in sentence.text:
                 valid_indices.append(idx)

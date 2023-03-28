@@ -125,15 +125,16 @@ def mixture_similarity(
 
         features = torch.stack([torch.mean(torch.stack(rep, dim=0), dim=0) for rep in reps_support_set.values()], dim=0)
         similarity_matrix = cosine_similarity(features.cpu(), trained_model.linear.weight.cpu().detach())
+        similarity_matrix_label2idx = {label: list(reps_support_set).index(label) for label in reps_support_set}
         if clip_vals:
             similarity_matrix = similarity_matrix.clip(min=0)
         similarity_matrix = normalize(similarity_matrix, norm=norm, axis=0)
 
         for label_idx, label in enumerate(label_dictionary.idx2item):
             if label in reps_support_set.keys():
-                weights = torch.tensor(similarity_matrix[label_idx], device=flair.device)
+                weights = torch.tensor(similarity_matrix[similarity_matrix_label2idx[label]], device=flair.device)
                 fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
-                fc.weight[label_idx] = torch.dot(weights, trained_model.linear.bias)
+                fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
 
             elif label in trained_model.label_dictionary.item2idx.keys():
                 fc.weight[label_idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
@@ -157,7 +158,7 @@ def mixture_softmax(trained_model: flair.nn.Model, corpus: flair.data.Corpus, la
             if label in reps_support_set.keys():
                 weights = torch.nn.functional.softmax(torch.mean(torch.stack(reps_support_set[label]), dim=0), dim=0)
                 fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
-                fc.weight[label_idx] = torch.dot(weights, trained_model.linear.bias)
+                fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
 
             # Fallback option: if the label is not present at all in the support set, check if there is a label that has the same name
             elif label in trained_model.label_dictionary.item2idx.keys():
@@ -345,7 +346,7 @@ def contrastive_pretraining(trained_model, corpus, save_base_path) -> None:
 
         print(40 * "-")
         print(
-            f"contrastive pretraingin | epoch {epoch} done | no improvements: {no_improvement}/{patience} | loss: {total_loss:2.7f}"
+            f"contrastive pretraining | epoch {epoch} done | no improvements: {no_improvement}/{patience} | loss: {total_loss:2.7f}"
         )
         print(40 * "-")
 
@@ -369,11 +370,11 @@ def train(args):
 
     save_base_path = Path(
         f"{args.cache_path}/auto-init-fewshot-flert/"
-        f"{args.transformer}{'-context' if args.use_context else ''}_"
-        f"{args.corpus}{args.fewnerd_granularity}_"
-        f"{args.lr}_{args.seed}_"
-        f"{args.pretrained_on}"
-        f"{args.init_method}"
+        f"{args.transformer}{'-context' if args.use_context else ''}"
+        f"_{args.corpus}{args.fewnerd_granularity}"
+        f"_{args.lr}-{args.seed}_"
+        f"_{args.pretrained_on}"
+        f"_{args.init_method}"
         f"{f'-{args.similarity_norm}' if args.init_method == 'mixture-similarity' else ''}"
         f"{f'-clip-vals' if args.init_method == 'mixture-similarity' and args.similarity_clip_vals else ''}"
         f"{'_early-stopping' if args.early_stopping else ''}"

@@ -21,7 +21,9 @@ def main(args):
 
     save_base_path = Path(
         f"{args.cache_path}/lowresource-dual-encoder/"
-        f"{args.transformer}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}/"
+        f"{args.transformer}"
+        f"_{args.corpus}{args.fewnerd_granularity}"
+        f"_{args.lr}-{args.seed}/"
     )
 
     with open(f"data/fewshot/fewshot_{args.corpus}{args.fewnerd_granularity}.json", "r") as f:

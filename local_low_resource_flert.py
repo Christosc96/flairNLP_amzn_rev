@@ -21,7 +21,9 @@ def main(args):
 
     save_base_path = Path(
         f"{args.cache_path}/lowresource-flert/"
-        f"{args.transformer}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}/"
+        f"{args.transformer}"
+        f"_{args.corpus}{args.fewnerd_granularity}"
+        f"_{args.lr}-{args.seed}/"
     )
 
     with open(f"data/fewshot/fewshot_{args.corpus}{args.fewnerd_granularity}.json", "r") as f:
@@ -106,7 +108,7 @@ if __name__ == "__main__":
     parser.add_argument("--bs", type=int, default=4)
     parser.add_argument("--mbs", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=200)
-    parser.add_argument("--early_stopping", type=bool, default=True)
+    parser.add_argument("--early_stopping", action="store_true")
     parser.add_argument("--min_lr", type=float, default=5e-7)
     args = parser.parse_args()
     main(args)

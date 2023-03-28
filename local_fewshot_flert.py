@@ -147,10 +147,10 @@ def main(args):
 
     save_base_path = Path(
         f"{args.cache_path}/reuse-weights-flert/"
-        f"{args.transformer}{'-context' if args.use_context else ''}_"
-        f"{args.corpus}{args.fewnerd_granularity}_"
-        f"{args.lr}_{args.seed}_"
-        f"{args.pretrained_on}"
+        f"{args.transformer}{'-context' if args.use_context else ''}"
+        f"_{args.corpus}{args.fewnerd_granularity}"
+        f"_{args.lr}-{args.seed}"
+        f"_{args.pretrained_on}"
         f"{'_early-stopping' if args.early_stopping else ''}"
         f"{f'_{args.matching_mode}-matching' if args.matching_mode else ''}"
         f"{f'_frozen-embeddings' if args.freeze_embeddings else ''}"

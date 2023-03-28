@@ -16,7 +16,10 @@ def main(args):
 
     save_base_path = Path(
         f"{args.cache_path}/pretrained-flert/"
-        f"{args.transformer}{'-context' if args.use_context else ''}_{args.corpus}{args.fewnerd_granularity}_{args.lr}_{args.seed}{f'_frozen-transformer' if args.freeze_transformer else ''}/"
+        f"{args.transformer}{'-context' if args.use_context else ''}"
+        f"_{args.corpus}{args.fewnerd_granularity}"
+        f"_{args.lr}-{args.seed}"
+        f"_{f'_frozen-transformer' if args.freeze_transformer else ''}/"
     )
 
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
