@@ -16,7 +16,10 @@ from flair.models import SequenceTagger
 from flair.optim import LinearSchedulerWithWarmup
 from flair.trainers import ModelTrainer
 from flair.training_utils import AnnealOnPlateau
-from local_contrastive_pretraining import contrastive_pretraining
+from local_contrastive_pretraining import (
+    contrastive_pretraining,
+    multiple_negatives_ranking_pretraining,
+)
 from local_corpora import get_corpus
 
 
@@ -224,58 +227,6 @@ def adapt_fc(trained_model: flair.nn.Model, corpus: flair.data.Corpus, args: arg
     return trained_model
 
 
-def generate_contrastive_pairs(corpus, r_max):
-    sentences = [sentence for sentence in corpus.train]
-    tokens_per_sentence = [[token for token in sentence] for sentence in corpus.train]
-    idx2label_per_sentence = [
-        {
-            token.idx: "B-" + label.value if idx == 0 else "I-" + label.value
-            for label in sentence.get_labels("ner")
-            for idx, token in enumerate(label.data_point.tokens)
-        }
-        for sentence in sentences
-    ]
-
-    label2token = {}
-    for tokens, idx2label in zip(tokens_per_sentence, idx2label_per_sentence):
-        for token in tokens:
-            if token.idx in idx2label:
-                if idx2label.get(token.idx) not in label2token:
-                    label2token[idx2label.get(token.idx)] = [token]
-                else:
-                    label2token[idx2label.get(token.idx)].append(token)
-            else:
-                if "O" not in label2token:
-                    label2token["O"] = [token]
-                else:
-                    label2token["O"].append(token)
-
-    import itertools
-    import random
-
-    from flair.data import Sentence
-
-    token_pairs = []
-    for label, tokens in label2token.items():
-        positives = list(itertools.combinations(tokens, 2))
-        if positives:
-            r = min(r_max, len(positives))
-            _positives = random.sample(positives, r)
-            for _positive1, _positive2 in _positives:
-                s1, s2 = Sentence(_positive1.text), Sentence(_positive2.text)
-                token_pairs.append((1, [s1, s2]))
-
-        for _r in range(r_max):
-            possible_negatives = [key for key in label2token.keys() if not key == label]
-            _negative = random.sample(possible_negatives, 1).pop()
-            negative = random.sample(label2token[_negative], 1).pop()
-            positive = random.sample(label2token[label], 1).pop()
-            s1, s2 = Sentence(positive.text), Sentence(negative.text)
-            token_pairs.append((0, [s1, s2]))
-
-    return token_pairs
-
-
 def train(args):
     if args.cuda:
         flair.device = f"cuda:{args.cuda_device}"
@@ -325,6 +276,9 @@ def train(args):
                 if args.contrastive_pretraining:
                     contrastive_pretraining(trained_model, corpus, save_base_path)
                     trained_model = SequenceTagger.load(save_base_path / "best-contrastive-model.pt")
+                elif args.multiple_negatives_ranking_pretraining:
+                    multiple_negatives_ranking_pretraining(trained_model, corpus, save_base_path)
+                    trained_model = SequenceTagger.load(save_base_path / "rm ")
 
                 trained_model = adapt_fc(trained_model, corpus, args)
 

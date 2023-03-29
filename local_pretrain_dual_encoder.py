@@ -33,7 +33,7 @@ def main(args):
     if args.label_encoder == "transformer":
         label_encoder = TransformerDocumentEmbeddings(args.transformer, fine_tune=not args.freeze_label_encoder)
     elif args.label_encoder == "glove":
-        label_encoder = WordEmbeddings(args.cache_path + "/glove_copy/glove.6B.300d.txt")
+        label_encoder = WordEmbeddings(args.cache_path + "/glove/glove.6B.300d.txt")
     else:
         raise Exception("Unknown label encoder.")
 
