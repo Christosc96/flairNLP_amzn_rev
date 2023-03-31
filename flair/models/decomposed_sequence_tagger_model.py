@@ -8,7 +8,8 @@ import torch.nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 import flair.nn
-from flair.models import SequenceTagger
+
+from .sequence_tagger_model import SequenceTagger
 
 log = logging.getLogger("flair")
 
