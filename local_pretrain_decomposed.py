@@ -19,7 +19,7 @@ def main(args):
         f"{args.transformer}{'-context' if args.use_context else ''}"
         f"_{args.corpus}{args.fewnerd_granularity}"
         f"_{args.lr}-{args.seed}"
-        f"_{f'frozen-transformer' if args.freeze_transformer else ''}/"
+        f"{f'_frozen-transformer' if args.freeze_transformer else ''}/"
     )
 
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
