@@ -19,7 +19,12 @@ class DecomposedSequenceTagger(SequenceTagger):
         super().__init__(**kwargs)
 
         self.schema_linear = torch.nn.Linear(self.embeddings.embedding_length, len(self.tag_format), bias=False)
-        raw_entities = [b"O"] + kwargs["tag_dictionary"].idx2item
+        raw_entities = [
+            label.encode("utf-8")
+            for label in list(
+                dict.fromkeys([label.decode("utf-8").split("-")[-1] for label in self.label_dictionary.idx2item])
+            )
+        ]
         self.entity_linear = torch.nn.Linear(self.embeddings.embedding_length, len(raw_entities), bias=False)
         decomposed_mapping = itertools.product(raw_entities, self.tag_format)
         decomposed_mapping = [

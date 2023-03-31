@@ -31,7 +31,6 @@ def main(args):
         model=args.transformer,
         layers="-1",
         subtoken_pooling="first",
-        fine_tune=args.freeze_transformer,
         use_context=args.use_context,
     )
 
