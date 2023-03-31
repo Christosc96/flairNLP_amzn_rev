@@ -159,7 +159,7 @@ def mixture_softmax(trained_model: flair.nn.Model, corpus: flair.data.Corpus, la
 
         for label_idx, label in enumerate(label_dictionary.idx2item):
             if label in reps_support_set.keys():
-                weights = torch.nn.functional.softmax(torch.mean(torch.stack(reps_support_set[label]), dim=0), dim=0)
+                weights = torch.mean(torch.softmax(torch.stack(reps_support_set[label]), dim=1), dim=0)
                 fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
                 fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
 
@@ -242,6 +242,7 @@ def train(args):
         f"{f'-clip-vals' if args.init_method == 'mixture-similarity' and args.similarity_clip_vals else ''}"
         f"{'_early-stopping' if args.early_stopping else ''}"
         f"{'_contrastive-pretraining' if args.contrastive_pretraining else ''}"
+        f"{'_mult-neg-ranking-pretraining' if args.multiple_negatives_ranking_pretraining else ''}"
         f"{f'_frozen-embeddings' if args.freeze_embeddings else ''}"
         f"{f'_decoder-lr-{args.lr * args.decoder_lr_factor}' if args.decoder_lr_factor != 1.0 else ''}"
     )
@@ -254,7 +255,7 @@ def train(args):
     results = {}
     for k in args.k:
         results[f"{k}"] = {"results": []}
-        for seed in range(5):
+        for seed in range(1, 5):
             flair.set_seed(seed)
             corpus = copy.copy(base_corpus)
             if k != 0:
@@ -278,7 +279,7 @@ def train(args):
                     trained_model = SequenceTagger.load(save_base_path / "best-contrastive-model.pt")
                 elif args.multiple_negatives_ranking_pretraining:
                     multiple_negatives_ranking_pretraining(trained_model, corpus, save_base_path)
-                    trained_model = SequenceTagger.load(save_base_path / "rm ")
+                    trained_model = SequenceTagger.load(save_base_path / "best-multiple-negatives-ranking-model.pt")
 
                 trained_model = adapt_fc(trained_model, corpus, args)
 
@@ -355,6 +356,7 @@ if __name__ == "__main__":
     parser.add_argument("--anneal_factor", type=float, default=0.5)
     parser.add_argument("--decoder_lr_factor", type=float, default=1.0)
     parser.add_argument("--contrastive_pretraining", action="store_true")
+    parser.add_argument("--multiple_negatives_ranking_pretraining", action="store_true")
     parser.add_argument("--init_method", type=str, default="random-weights")
     parser.add_argument("--representation", type=str, default="embeddings")
     parser.add_argument("--similarity_norm", type=str, default="l2")

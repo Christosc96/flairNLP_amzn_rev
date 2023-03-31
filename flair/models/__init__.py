@@ -1,4 +1,5 @@
 from .clustering import ClusteringModel
+from .decomposed_sequence_tagger_model import DecomposedSequenceTagger
 from .dual_encoder import DualEncoder
 from .entity_linker_model import EntityLinker
 from .language_model import LanguageModel
@@ -32,4 +33,5 @@ __all__ = [
     "ClusteringModel",
     "MultitaskModel",
     "DualEncoder",
+    "DecomposedSequenceTagger",
 ]
