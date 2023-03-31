@@ -19,7 +19,6 @@ def main(args):
         f"{args.transformer}{'-context' if args.use_context else ''}"
         f"_{args.corpus}{args.fewnerd_granularity}"
         f"_{args.lr}-{args.seed}"
-        f"{f'_frozen-transformer' if args.freeze_transformer else ''}/"
     )
 
     corpus = get_corpus(args.corpus, args.fewnerd_granularity)
@@ -81,6 +80,5 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--early_stopping", type=bool, default=False)
     parser.add_argument("--min_lr", type=float, default=5e-7)
-    parser.add_argument("--freeze_transformer", action="store_true")
     args = parser.parse_args()
     main(args)
