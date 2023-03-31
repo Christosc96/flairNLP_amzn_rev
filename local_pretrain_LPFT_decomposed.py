@@ -13,8 +13,7 @@ def get_save_base_path(args):
         f"{args.cache_path}/decomposed-flert/"
         f"{args.transformer}{'-context' if args.use_context else ''}"
         f"_{args.corpus}{args.fewnerd_granularity}"
-        f"_{args.lr}-{args.seed}"
-        f"_LPFT-{args.frozen_lr}-{args.finetuning_lr}"
+        f"_LPFT-{args.frozen_lr}-{args.finetuning_lr}-{args.seed}"
     )
 
 
