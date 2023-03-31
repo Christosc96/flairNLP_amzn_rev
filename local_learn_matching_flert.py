@@ -137,11 +137,20 @@ def mixture_similarity(
             if label in reps_support_set.keys():
                 weights = torch.tensor(similarity_matrix[similarity_matrix_label2idx[label]], device=flair.device)
                 fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
-                fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
+                if trained_model.linear.bias is not None:
+                    fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
+
+            elif label.startswith(b"I") and label.replace(b"I-", b"B-") in reps_support_set.keys():
+                label = label.replace(b"I-", b"B-")
+                weights = torch.tensor(similarity_matrix[similarity_matrix_label2idx[label]], device=flair.device)
+                fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
+                if trained_model.linear.bias is not None:
+                    fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
 
             elif label in trained_model.label_dictionary.item2idx.keys():
                 fc.weight[label_idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
-                fc.bias[label_idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
+                if trained_model.linear.bias is not None:
+                    fc.bias[label_idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
 
             else:
                 # use the random init weight
@@ -161,12 +170,21 @@ def mixture_softmax(trained_model: flair.nn.Model, corpus: flair.data.Corpus, la
             if label in reps_support_set.keys():
                 weights = torch.mean(torch.softmax(torch.stack(reps_support_set[label]), dim=1), dim=0)
                 fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
-                fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
+                if trained_model.linear.bias is not None:
+                    fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
+
+            elif label.startswith(b"I") and label.replace(b"I-", b"B-") in reps_support_set.keys():
+                label = label.replace(b"I-", b"B-")
+                weights = torch.mean(torch.softmax(torch.stack(reps_support_set[label]), dim=1), dim=0)
+                fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
+                if trained_model.linear.bias is not None:
+                    fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
 
             # Fallback option: if the label is not present at all in the support set, check if there is a label that has the same name
             elif label in trained_model.label_dictionary.item2idx.keys():
                 fc.weight[label_idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
-                fc.bias[label_idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
+                if trained_model.linear.bias is not None:
+                    fc.bias[label_idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
 
             else:
                 # use the random init weight
