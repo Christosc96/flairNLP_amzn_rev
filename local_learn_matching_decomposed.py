@@ -12,7 +12,7 @@ from torch.utils.data.dataset import Subset
 
 import flair
 from flair.data import Dictionary
-from flair.models import SequenceTagger
+from flair.models import DecomposedSequenceTagger
 from flair.optim import LinearSchedulerWithWarmup
 from flair.trainers import ModelTrainer
 from flair.training_utils import AnnealOnPlateau
@@ -48,11 +48,30 @@ def bio_label_dictionary(corpus: flair.data.Corpus, tag_format: str = "BIO", tag
     return bio_label_dictionary
 
 
+def decomposed_entity_linear(label_dictionary: flair.data.Dictionary, tag_format: str):
+    raw_entities = [
+        label.encode("utf-8")
+        for label in list(dict.fromkeys([label.decode("utf-8").split("-")[-1] for label in label_dictionary.idx2item]))
+    ]
+    decomposed_mapping = itertools.product(raw_entities, tag_format)
+    decomposed_mapping = [f"{schema}-{entity.decode('utf-8')}".encode("utf-8") for entity, schema in decomposed_mapping]
+    decomposed_mapping_mask = torch.tensor(
+        [
+            True if bio_label in label_dictionary.item2idx or bio_label == b"O-O" else False
+            for bio_label in decomposed_mapping
+        ],
+        dtype=torch.bool,
+        device=flair.device,
+    ).view(len(raw_entities), len(tag_format))
+    return raw_entities, decomposed_mapping_mask
+
+
 def new_classfier(trained_model: flair.nn.Model, label_dictionary: flair.data.Dictionary):
-    fc = torch.nn.Linear(trained_model.linear.in_features, len(label_dictionary), device=flair.device)
+    raw_entities, decomposed_mapping_mask = decomposed_entity_linear(label_dictionary, trained_model.tag_format)
+    fc = torch.nn.Linear(trained_model.entity_linear.in_features, len(raw_entities), device=flair.device)
     fc.weight.normal_(0, 0.02)
     fc.bias.normal_(0.02)
-    return fc
+    return fc, decomposed_mapping_mask
 
 
 def get_representations_for_support_set(
@@ -75,14 +94,15 @@ def get_representations_for_support_set(
 
             elif representation == "features":
                 sentence_tensor, lengths = trained_model._prepare_tensors(_sentences)
-                reps.extend(trained_model.forward(sentence_tensor, lengths))
+                entity_features = trained_model.entity_linear(sentence_tensor)
+                reps.extend(trained_model._get_scores_from_features(entity_features, lengths))
 
     lengths = [0] + list(itertools.accumulate([len(x) for x in all_sentences]))
     reps = [reps[lengths[i] : lengths[i + 1]] for i in range(len(lengths) - 1)]
 
     labels_per_sentence = [
         {
-            _token.idx: ("B-" + _label.value).encode("utf-8") if idx == 0 else ("I-" + _label.value).encode("utf-8")
+            _token.idx: _label.value.encode("utf-8")
             for _label in _sentence.get_labels("ner")
             for idx, _token in enumerate(_label.data_point.tokens)
         }
@@ -108,8 +128,8 @@ def exact_matching(trained_model: flair.nn.Model, label_dictionary: flair.data.D
         fc = new_classfier(trained_model, label_dictionary)
         for idx, label in enumerate(label_dictionary.idx2item):
             if label in trained_model.label_dictionary.item2idx.keys():
-                fc.weight[idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
-                fc.bias[idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
+                fc.weight[idx] = trained_model.entity_linear.weight[trained_model.label_dictionary.item2idx[label]]
+                fc.bias[idx] = trained_model.entity_linear.bias[trained_model.label_dictionary.item2idx[label]]
 
     return fc
 
@@ -127,7 +147,7 @@ def mixture_similarity(
         fc = new_classfier(trained_model, label_dictionary)
 
         features = torch.stack([torch.mean(torch.stack(rep, dim=0), dim=0) for rep in reps_support_set.values()], dim=0)
-        similarity_matrix = cosine_similarity(features.cpu(), trained_model.linear.weight.cpu().detach())
+        similarity_matrix = cosine_similarity(features.cpu(), trained_model.entity_linear.weight.cpu().detach())
         similarity_matrix_label2idx = {label: list(reps_support_set).index(label) for label in reps_support_set}
         if clip_vals:
             similarity_matrix = similarity_matrix.clip(min=0)
@@ -136,21 +156,25 @@ def mixture_similarity(
         for label_idx, label in enumerate(label_dictionary.idx2item):
             if label in reps_support_set.keys():
                 weights = torch.tensor(similarity_matrix[similarity_matrix_label2idx[label]], device=flair.device)
-                fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
-                if trained_model.linear.bias is not None:
-                    fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
+                fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.entity_linear.weight).squeeze(0)
+                if trained_model.entity_linear.bias is not None:
+                    fc.bias[label_idx] = torch.dot(weights, trained_model.entity_linear.bias)
 
             elif label.startswith(b"I") and label.replace(b"I-", b"B-") in reps_support_set.keys():
                 label = label.replace(b"I-", b"B-")
                 weights = torch.tensor(similarity_matrix[similarity_matrix_label2idx[label]], device=flair.device)
-                fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
-                if trained_model.linear.bias is not None:
-                    fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
+                fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.entity_linear.weight).squeeze(0)
+                if trained_model.entity_linear.bias is not None:
+                    fc.bias[label_idx] = torch.dot(weights, trained_model.entity_linear.bias)
 
             elif label in trained_model.label_dictionary.item2idx.keys():
-                fc.weight[label_idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
-                if trained_model.linear.bias is not None:
-                    fc.bias[label_idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
+                fc.weight[label_idx] = trained_model.entity_linear.weight[
+                    trained_model.label_dictionary.item2idx[label]
+                ]
+                if trained_model.entity_linear.bias is not None:
+                    fc.bias[label_idx] = trained_model.entity_linear.bias[
+                        trained_model.label_dictionary.item2idx[label]
+                    ]
 
             else:
                 # use the random init weight
@@ -164,33 +188,19 @@ def mixture_softmax(trained_model: flair.nn.Model, corpus: flair.data.Corpus, la
     with torch.no_grad():
 
         reps_support_set = get_representations_for_support_set(trained_model, corpus, "features")
-        fc = new_classfier(trained_model, label_dictionary)
+        fc, decomposed_entity_mask = new_classfier(trained_model, label_dictionary)
 
-        for label_idx, label in enumerate(label_dictionary.idx2item):
-            if label in reps_support_set.keys():
-                weights = torch.mean(torch.softmax(torch.stack(reps_support_set[label]), dim=1), dim=0)
-                fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
-                if trained_model.linear.bias is not None:
-                    fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
-
-            elif label.startswith(b"I") and label.replace(b"I-", b"B-") in reps_support_set.keys():
-                label = label.replace(b"I-", b"B-")
-                weights = torch.mean(torch.softmax(torch.stack(reps_support_set[label]), dim=1), dim=0)
-                fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.linear.weight).squeeze(0)
-                if trained_model.linear.bias is not None:
-                    fc.bias[label_idx] = torch.dot(weights, trained_model.linear.bias)
-
-            # Fallback option: if the label is not present at all in the support set, check if there is a label that has the same name
-            elif label in trained_model.label_dictionary.item2idx.keys():
-                fc.weight[label_idx] = trained_model.linear.weight[trained_model.label_dictionary.item2idx[label]]
-                if trained_model.linear.bias is not None:
-                    fc.bias[label_idx] = trained_model.linear.bias[trained_model.label_dictionary.item2idx[label]]
+        for label_idx, (label, tensors) in enumerate(reps_support_set.items()):
+            weights = torch.mean(torch.softmax(torch.stack(tensors), dim=1), dim=0)
+            fc.weight[label_idx] = torch.mm(weights.reshape(1, -1), trained_model.entity_linear.weight).squeeze(0)
+            if trained_model.entity_linear.bias is not None:
+                fc.bias[label_idx] = torch.dot(weights, trained_model.entity_linear.bias)
 
             else:
                 # use the random init weight
                 pass
 
-    return fc
+    return fc, decomposed_entity_mask
 
 
 def mean_std_of_data(
@@ -222,25 +232,28 @@ def adapt_fc(trained_model: flair.nn.Model, corpus: flair.data.Corpus, args: arg
     new_label_dictionary = bio_label_dictionary(corpus, args.tag_format, args.tag_type)
     if not args.init_method == "random-weights":
         if args.init_method == "mixture-similarity":
-            fc = mixture_similarity(
+            fc, decomposed_entity_mask = mixture_similarity(
                 trained_model, corpus, new_label_dictionary, args.similarity_norm, args.similarity_clip_vals
             )
         elif args.init_method == "mixture-softmax":
-            fc = mixture_softmax(trained_model, corpus, new_label_dictionary)
+            fc, decomposed_entity_mask = mixture_softmax(trained_model, corpus, new_label_dictionary)
         elif args.init_method == "mean-std":
-            fc = mean_std_of_data(trained_model, corpus, new_label_dictionary, args.representation)
+            fc, decomposed_entity_mask = mean_std_of_data(
+                trained_model, corpus, new_label_dictionary, args.representation
+            )
         elif args.init_method == "exact-matching":
-            fc = exact_matching(trained_model, new_label_dictionary)
+            fc, decomposed_entity_mask = exact_matching(trained_model, new_label_dictionary)
         else:
             raise Exception(f"Unknown init method: {args.init_method}")
     else:
         with torch.no_grad():
-            fc = new_classfier(trained_model, new_label_dictionary)
+            fc, decomposed_entity_mask = new_classfier(trained_model, new_label_dictionary)
 
     trained_model.tag_format = args.tag_format
     trained_model.label_dictionary = new_label_dictionary
     trained_model.tagset_size = len(new_label_dictionary)
-    trained_model.linear = fc
+    trained_model.entity_linear = fc
+    trained_model.decomposed_mapping_mask = decomposed_entity_mask
 
     return trained_model
 
@@ -250,7 +263,7 @@ def train(args):
         flair.device = f"cuda:{args.cuda_device}"
 
     save_base_path = Path(
-        f"{args.cache_path}/auto-init-fewshot-flert/"
+        f"{args.cache_path}/auto-init-fewshot-decomposed/"
         f"{args.transformer}{'-context' if args.use_context else ''}"
         f"_{args.corpus}{args.fewnerd_granularity}"
         f"_{args.lr}-{args.seed}"
@@ -282,7 +295,7 @@ def train(args):
                 pass
             corpus._dev = Subset(base_corpus._train, [])
 
-            trained_model = SequenceTagger.load(args.pretrained_model_path)
+            trained_model = DecomposedSequenceTagger.load(args.pretrained_model_path)
             if args.freeze_embeddings:
                 trained_model.embeddings.fine_tune = False
                 trained_model.embeddings.static_embeddings = True
@@ -294,10 +307,12 @@ def train(args):
             if k > 0:
                 if args.contrastive_pretraining:
                     contrastive_pretraining(trained_model, corpus, save_base_path)
-                    trained_model = SequenceTagger.load(save_base_path / "best-contrastive-model.pt")
+                    trained_model = DecomposedSequenceTagger.load(save_base_path / "best-contrastive-model.pt")
                 elif args.multiple_negatives_ranking_pretraining:
                     multiple_negatives_ranking_pretraining(trained_model, corpus, save_base_path)
-                    trained_model = SequenceTagger.load(save_base_path / "best-multiple-negatives-ranking-model.pt")
+                    trained_model = DecomposedSequenceTagger.load(
+                        save_base_path / "best-multiple-negatives-ranking-model.pt"
+                    )
 
                 trained_model = adapt_fc(trained_model, corpus, args)
 

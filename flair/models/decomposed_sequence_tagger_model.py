@@ -36,7 +36,7 @@ class DecomposedSequenceTagger(SequenceTagger):
                 for bio_label in decomposed_mapping
             ],
             dtype=torch.bool,
-        ).view(len(self.tag_format), len(raw_entities))
+        ).view(len(raw_entities), len(self.tag_format))
         assert self.decomposed_mapping_mask.sum().item() == len(self.label_dictionary)
 
         self.to(flair.device)
@@ -72,7 +72,7 @@ class DecomposedSequenceTagger(SequenceTagger):
 
         batch_size, seq_length, _ = schema_features.shape
         features = torch.bmm(
-            schema_features.view(batch_size * seq_length, -1, 1), entity_features.view(batch_size * seq_length, 1, -1)
+            entity_features.view(batch_size * seq_length, -1, 1), schema_features.view(batch_size * seq_length, 1, -1)
         )
         features = features[self.decomposed_mapping_mask.repeat(batch_size * seq_length, 1, 1)].view(
             batch_size, seq_length, len(self.label_dictionary.idx2item)
