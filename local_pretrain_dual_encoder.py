@@ -30,9 +30,6 @@ def main(args):
     assert args.corpus == "fewnerd"
     corpus, masked_labels = get_masked_fewnerd_corpus(args.seed, args.fewnerd_granularity, inverse_mask=False)
 
-    with open(save_base_path / "masked_labels.json", "w") as f:
-        json.dump(masked_labels, f)
-
     tag_type = "ner"
     label_dictionary = corpus.make_label_dictionary(tag_type, add_unk=False)
 
@@ -57,6 +54,9 @@ def main(args):
         mini_batch_chunk_size=args.mbs,
         max_epochs=args.epochs,
     )
+
+    with open(save_base_path / "masked_labels.json", "w") as f:
+        json.dump(masked_labels, f)
 
 
 if __name__ == "__main__":
