@@ -22,7 +22,7 @@ def main(args):
     save_base_path = Path(
         f"{args.cache_path}/pretrained-dual-encoder/"
         f"{args.transformer if args.label_encoder == 'transformer' else 'glove'}"
-        f"_{args.corpus}{f'-{args.fewnerd_granularity}'}-masked_"
+        f"_{args.corpus}{f'-{args.fewnerd_granularity}'}-masked"
         f"_{args.lr}-{args.seed}"
     )
 
