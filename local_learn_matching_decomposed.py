@@ -125,13 +125,16 @@ def get_representations_for_support_set(
 
 def exact_matching(trained_model: flair.nn.Model, label_dictionary: flair.data.Dictionary):
     with torch.no_grad():
-        fc = new_classfier(trained_model, label_dictionary)
-        for idx, label in enumerate(label_dictionary.idx2item):
-            if label in trained_model.label_dictionary.item2idx.keys():
-                fc.weight[idx] = trained_model.entity_linear.weight[trained_model.label_dictionary.item2idx[label]]
-                fc.bias[idx] = trained_model.entity_linear.bias[trained_model.label_dictionary.item2idx[label]]
+        raw_entities, _ = decomposed_entity_linear(label_dictionary, trained_model.tag_format)
+        pretrained_entities, _ = decomposed_entity_linear(label_dictionary, trained_model.tag_format)
+        fc, decomposed_mapping_mask = new_classfier(trained_model, label_dictionary)
+        for idx, label in enumerate(raw_entities):
+            if label in pretrained_entities:
+                fc.weight[idx] = trained_model.entity_linear.weight[pretrained_entities.index(label)]
+                if trained_model.entity_linear.bias is not None:
+                    fc.bias[idx] = trained_model.entity_linear.bias[pretrained_entities.index(label)]
 
-    return fc
+    return fc, decomposed_mapping_mask
 
 
 def mixture_similarity(
