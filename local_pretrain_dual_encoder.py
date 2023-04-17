@@ -30,7 +30,7 @@ def main(args):
     assert args.corpus == "fewnerd"
     corpus, masked_labels = get_masked_fewnerd_corpus(args.seed, args.fewnerd_granularity, inverse_mask=False)
 
-    with open("masked_labels.json", "w") as f:
+    with open(save_base_path / "masked_labels.json", "w") as f:
         json.dump(masked_labels, f)
 
     tag_type = "ner"
