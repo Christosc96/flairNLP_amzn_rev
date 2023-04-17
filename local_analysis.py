@@ -175,11 +175,11 @@ def plot_tsne(corpus_name: str = "conll_03", matching_mode: str = "exact", model
         pretrained_model_path = "/glusterfs/dfs-gfs-dist/goldejon/flair-models/pretrained-flert/bert-base-uncased_ontonotes_1e-05_123/final-model.pt"
         model = SequenceTagger.load(pretrained_model_path)
 
-        from local_fewshot_flert import bio_label_dictionary
+        from archived_scripts.local_fewshot_flert import bio_label_dictionary
 
         new_label_dictionary = bio_label_dictionary(corpus, "BIO", "ner")
 
-        from local_fewshot_flert import (
+        from archived_scripts.local_fewshot_flert import (
             random_initialized_classification_head,
             reuse_classification_head,
         )
@@ -276,11 +276,11 @@ def plot_tsne_labels(corpus_name: str = "conll_03", matching_mode: str = "exact"
         pretrained_model_path = "/glusterfs/dfs-gfs-dist/goldejon/flair-models/pretrained-flert/bert-base-uncased_ontonotes_1e-05_123/final-model.pt"
         model = SequenceTagger.load(pretrained_model_path)
 
-        from local_fewshot_flert import bio_label_dictionary
+        from archived_scripts.local_fewshot_flert import bio_label_dictionary
 
         new_label_dictionary = bio_label_dictionary(corpus, "BIO", "ner")
 
-        from local_fewshot_flert import (
+        from archived_scripts.local_fewshot_flert import (
             random_initialized_classification_head,
             reuse_classification_head,
         )
