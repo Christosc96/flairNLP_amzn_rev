@@ -38,7 +38,7 @@ def main(args):
 
     token_encoder = TransformerWordEmbeddings(args.transformer)
     if args.label_encoder == "transformer":
-        label_encoder = TransformerDocumentEmbeddings(args.transformer, fine_tune=not args.freeze_label_encoder)
+        label_encoder = TransformerDocumentEmbeddings(args.transformer)
     elif args.label_encoder == "glove":
         label_encoder = WordEmbeddings(args.cache_path + "/glove/glove.6B.300d.txt")
     else:
