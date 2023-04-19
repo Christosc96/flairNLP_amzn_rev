@@ -3,7 +3,7 @@ import os
 
 from torch.utils.data.dataset import Subset
 
-from local_corpora import get_corpus
+from local_corpora import get_corpus, get_masked_fewnerd_corpus
 
 
 def main():
@@ -118,5 +118,33 @@ def fewnerd_fine():
         json.dump(fewnerd_indices, f)
 
 
+def masked_fewshot_splits():
+    fewnerd_granularities = ["fine", "coarse", "coarse-fine", "coarse-without-misc"]
+    pretraining_seeds = [10, 20, 30, 40, 50]
+
+    for fewnerd_granularity in fewnerd_granularities:
+        fewnerd_indices = {}
+        for pretraining_seed in pretraining_seeds:
+            fewnerd, kept_labels = get_masked_fewnerd_corpus(pretraining_seed, fewnerd_granularity, inverse_mask=True)
+            tag_type = "ner"
+            label_dict = fewnerd.make_label_dictionary(tag_type, add_unk=False)
+            labels = [label.decode("utf-8") for label in label_dict.idx2item]
+            for k in [1, 2, 4, 8, 16, 32, 64]:
+                for fewshot_seed in range(5):
+                    indices = fewnerd._sample_n_way_k_shots(
+                        dataset=fewnerd._train,
+                        labels=labels,
+                        tag_type=tag_type,
+                        n=-1,
+                        k=k,
+                        seed=fewshot_seed,
+                        return_indices=True,
+                    )
+                    fewnerd_indices[f"{k}-{pretraining_seed}-{fewshot_seed}"] = indices
+
+        with open(f"data/fewshot/fewshot_masked-fewnerd-{fewnerd_granularity}.json", "w") as f:
+            json.dump(fewnerd_indices, f)
+
+
 if __name__ == "__main__":
-    main()
+    masked_fewshot_splits()

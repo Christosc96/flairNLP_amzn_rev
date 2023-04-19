@@ -348,9 +348,9 @@ def get_masked_fewnerd_corpus(seed: int = None, fewnerd_granularity: str = "", i
     selected_labels = random.sample(coarse_labels, int(0.5 * len(coarse_labels)))
     not_selected_labels = list(set(coarse_labels) - set(selected_labels))
     if not inverse_mask:
-        labels_to_mask = selected_labels
+        labels_to_keep = selected_labels
     else:
-        labels_to_mask = not_selected_labels
+        labels_to_keep = not_selected_labels
     label_map = get_fewnerd_label_map(fewnerd_granularity)
-    masked_label_map = {k: v if k.startswith(tuple(labels_to_mask)) else "O" for k, v in label_map.items()}
-    return FEWNERD(label_name_map=masked_label_map), labels_to_mask
+    masked_label_map = {k: v if k.startswith(tuple(labels_to_keep)) else "O" for k, v in label_map.items()}
+    return FEWNERD(label_name_map=masked_label_map), labels_to_keep

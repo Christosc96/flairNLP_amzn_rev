@@ -28,7 +28,7 @@ def main(args):
 
     # corpus = get_corpus(args.corpus, args.fewnerd_granularity, mask_ratio=args.mask_ratio)
     assert args.corpus == "fewnerd"
-    corpus, masked_labels = get_masked_fewnerd_corpus(args.seed, args.fewnerd_granularity, inverse_mask=False)
+    corpus, kept_labels = get_masked_fewnerd_corpus(args.seed, args.fewnerd_granularity, inverse_mask=False)
 
     tag_type = "ner"
     label_dictionary = corpus.make_label_dictionary(tag_type, add_unk=False)
@@ -55,8 +55,8 @@ def main(args):
         max_epochs=args.epochs,
     )
 
-    with open(save_base_path / "masked_labels.json", "w") as f:
-        json.dump(masked_labels, f)
+    with open(save_base_path / "kept_labels.json", "w") as f:
+        json.dump(kept_labels, f)
 
 
 if __name__ == "__main__":
