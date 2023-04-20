@@ -22,13 +22,13 @@ def main(args):
     save_base_path = Path(
         f"{args.cache_path}/pretrained-dual-encoder/"
         f"{args.transformer if args.label_encoder == 'transformer' else 'glove'}"
-        f"_{args.corpus}{f'-{args.fewnerd_granularity}'}-masked"
+        f"_{args.corpus}{f'-{args.fewnerd_granularity}'}-inverse-masked"
         f"_{args.lr}-{args.seed}"
     )
 
     # corpus = get_corpus(args.corpus, args.fewnerd_granularity, mask_ratio=args.mask_ratio)
     assert args.corpus == "fewnerd"
-    corpus, kept_labels = get_masked_fewnerd_corpus(args.seed, args.fewnerd_granularity, inverse_mask=False)
+    corpus, kept_labels = get_masked_fewnerd_corpus(args.seed, args.fewnerd_granularity, inverse_mask=args.inverse_mask)
 
     tag_type = "ner"
     label_dictionary = corpus.make_label_dictionary(tag_type, add_unk=False)
@@ -68,6 +68,7 @@ if __name__ == "__main__":
     parser.add_argument("--corpus", type=str, default="fewnerd")
     parser.add_argument("--fewnerd_granularity", "--list", nargs="+", default="coarse")
     parser.add_argument("--label_encoder", type=str, default="transformer")
+    parser.add_argument("--inverse_mask", action="store_true")
     parser.add_argument("--transformer", type=str, default="bert-base-uncased")
     parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--bs", type=int, default=10)

@@ -400,3 +400,51 @@ def to_csv(save_path: str, save_path_per_class: str):
     index = pd.MultiIndex.from_tuples(index_tuples, names=["Experiment", "Label"])
     df = pd.DataFrame(data=df_data, index=index)
     df.to_csv(save_path_per_class)
+
+
+def new():
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    coarse_mean = 1
+    coarse_std = 1
+    coarse_without_misc_mean = 1
+    coarse_without_misc_std = 1
+    fine_mean = 1
+    fine_std = 1
+    coarse_fine_mean = 1
+    coarse_fine_std = 1
+    plt.style.use("seaborn")
+    x, y = zip(*coarse_mean)
+    k, sigma = zip(*coarse_std)
+    lower_bound = np.array(y) - np.array(sigma)
+    upper_bound = np.array(y) + np.array(sigma)
+    lower_bound = lower_bound.clip(min=0)
+    plt.plot(x, y, color="tab:blue", label="coarse")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:blue")
+    x, y = zip(*coarse_without_misc_mean)
+    k, sigma = zip(*coarse_without_misc_std)
+    lower_bound = np.array(y) - np.array(sigma)
+    upper_bound = np.array(y) + np.array(sigma)
+    lower_bound = lower_bound.clip(min=0)
+    plt.plot(x, y, color="tab:orange", label="coarse without misc")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:orange")
+    x, y = zip(*fine_mean)
+    k, sigma = zip(*fine_std)
+    lower_bound = np.array(y) - np.array(sigma)
+    upper_bound = np.array(y) + np.array(sigma)
+    lower_bound = lower_bound.clip(min=0)
+    plt.plot(x, y, color="tab:brown", label="fine")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:brown")
+    x, y = zip(*coarse_fine_mean)
+    k, sigma = zip(*coarse_fine_std)
+    lower_bound = np.array(y) - np.array(sigma)
+    upper_bound = np.array(y) + np.array(sigma)
+    lower_bound = lower_bound.clip(min=0)
+    plt.plot(x, y, color="tab:purple", label="coarse fine")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:purple")
+    plt.legend(loc="lower right", title="pretraining labels")
+    plt.xlabel("k-shots")
+    plt.ylabel("F1 score (span-level)")
+    plt.title("Impact of label verbalizers - few-shot on coarse labels")
+    plt.show()
