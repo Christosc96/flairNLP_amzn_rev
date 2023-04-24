@@ -402,47 +402,202 @@ def to_csv(save_path: str, save_path_per_class: str):
     df.to_csv(save_path_per_class)
 
 
-def new():
+def extract_single_run(path, k="1"):
+    if k == "0":
+        to_check = "result.txt"
+    else:
+        to_check = "training.log"
+    with open(path / to_check, "r") as f:
+        for line in f.readlines():
+            if "micro avg" in line and line.split()[0] == "micro":
+                return round(float(line.split()[-2]) * 100, 2)
+
+
+def extract_multiple_runs(path):
+    import glob
+
+    import numpy as np
+
+    files = glob.glob(f"{path}/*10*")
+    results = {}
+    for file in files:
+        k = file.split("/")[-1].split("_")[0].replace("shot", "")
+
+        f1_score = extract_single_run(path / file, k)
+        if k not in results:
+            results[k] = {}
+            results[k]["results"] = [f1_score]
+        else:
+            results[k]["results"].append(f1_score)
+
+    for key, result_dict in results.items():
+        results[key]["average"] = np.mean(result_dict["results"])
+        results[key]["std"] = np.std(result_dict["results"])
+    return results
+
+
+def extract_x_y(result_dict):
+    import numpy as np
+
+    result_dict = {int(k): v for k, v in result_dict.items()}
+
+    # Sort keys
+    sorted_keys = sorted(result_dict)
+    result_dict = {k: result_dict[k] for k in sorted_keys}
+
+    y = np.array([v["average"] for k, v in result_dict.items()])
+    sigma = np.array([v["std"] for k, v in result_dict.items()])
+    x = np.array([k for k, v in result_dict.items()])
+    lower_bound = y - sigma
+    upper_bound = y + sigma
+    lower_bound = lower_bound.clip(min=0)
+    return x, y, lower_bound, upper_bound
+
+
+def extended_experiments():
+    from pathlib import Path
+
     import matplotlib.pyplot as plt
     import numpy as np
 
-    coarse_mean = 1
-    coarse_std = 1
-    coarse_without_misc_mean = 1
-    coarse_without_misc_std = 1
-    fine_mean = 1
-    fine_std = 1
-    coarse_fine_mean = 1
-    coarse_fine_std = 1
+    pretrained_dual_encoder_path = Path(
+        "/glusterfs/dfs-gfs-dist/goldejon/flair-models/pretrained-dual-encoder/masked-models"
+    )
+    low_resource_dual_encoder_path = Path(
+        "/glusterfs/dfs-gfs-dist/goldejon/flair-models/lowresource-dual-encoder/masked-models"
+    )
+    low_resource_flert_path = Path("/glusterfs/dfs-gfs-dist/goldejon/flair-models/lowresource-flert/masked-models")
+    fewshot_dual_encoder_path = Path("/glusterfs/dfs-gfs-dist/goldejon/flair-models/fewshot-dual-encoder/masked-models")
+
+    coarse_pretrained_score = extract_single_run(
+        pretrained_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-inverse-masked_1e-05-10"
+    )
+    fine_pretrained_score = extract_single_run(
+        pretrained_dual_encoder_path / "bert-base-uncased_fewnerd-fine-inverse-masked_1e-05-10"
+    )
+
+    coarse_low_resource_dual_encoder_results = extract_multiple_runs(
+        low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-masked_1e-05_early-stopping"
+    )
+    fine_low_resource_dual_encoder_results = extract_multiple_runs(
+        low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-fine-masked_1e-05_early-stopping"
+    )
+
+    coarse_low_resource_flert_results = extract_multiple_runs(
+        low_resource_flert_path / "bert-base-uncased_fewnerd-coarse-masked_1e-05_early-stopping"
+    )
+    fine_low_resource_flert_results = extract_multiple_runs(
+        low_resource_flert_path / "bert-base-uncased_fewnerd-fine-masked_1e-05_early-stopping"
+    )
+
+    coarse_fewshot_pretrained_on_coarse_results = extract_multiple_runs(
+        fewshot_dual_encoder_path
+        / "bert-base-uncased_fewnerd-coarse-fine-masked_pretrained-on-fewnerd-coarse-masked-10_1e-05_early-stopping"
+    )
+    coarse_fewshot_pretrained_on_coarse_no_misc_results = extract_multiple_runs(
+        fewshot_dual_encoder_path
+        / "bert-base-uncased_fewnerd-coarse-fine-masked_pretrained-on-fewnerd-coarse-without-misc-masked-10_1e-05_early-stopping"
+    )
+    coarse_fewshot_pretrained_on_fine_results = extract_multiple_runs(
+        fewshot_dual_encoder_path
+        / "bert-base-uncased_fewnerd-coarse-fine-masked_pretrained-on-fewnerd-fine-masked-10_1e-05_early-stopping"
+    )
+    coarse_fewshot_pretrained_on_coarse_fine_results = extract_multiple_runs(
+        fewshot_dual_encoder_path
+        / "bert-base-uncased_fewnerd-coarse-fine-masked_pretrained-on-fewnerd-coarse-fine-masked-10_1e-05_early-stopping"
+    )
+
+    fine_fewshot_pretrained_on_coarse_results = extract_multiple_runs(
+        fewshot_dual_encoder_path
+        / "bert-base-uncased_fewnerd-fine-masked_pretrained-on-fewnerd-coarse-masked-10_1e-05_early-stopping"
+    )
+    fine_fewshot_pretrained_on_coarse_no_misc_results = extract_multiple_runs(
+        fewshot_dual_encoder_path
+        / "bert-base-uncased_fewnerd-fine-masked_pretrained-on-fewnerd-coarse-without-misc-masked-10_1e-05_early-stopping"
+    )
+    fine_fewshot_pretrained_on_fine_results = extract_multiple_runs(
+        fewshot_dual_encoder_path
+        / "bert-base-uncased_fewnerd-fine-masked_pretrained-on-fewnerd-fine-masked-10_1e-05_early-stopping"
+    )
+    fine_fewshot_pretrained_on_coarse_fine_results = extract_multiple_runs(
+        fewshot_dual_encoder_path
+        / "bert-base-uncased_fewnerd-fine-masked_pretrained-on-fewnerd-coarse-fine-masked-10_1e-05_early-stopping"
+    )
+
     plt.style.use("seaborn")
-    x, y = zip(*coarse_mean)
-    k, sigma = zip(*coarse_std)
-    lower_bound = np.array(y) - np.array(sigma)
-    upper_bound = np.array(y) + np.array(sigma)
-    lower_bound = lower_bound.clip(min=0)
+    plt.plot()
+
+    plt.plot(
+        np.array([0, 1, 2, 4, 8, 16, 32, 64]),
+        np.array([coarse_pretrained_score] * 8),
+        color="red",
+        label="full-finetuning",
+    )
+
+    x, y, lower_bound, upper_bound = extract_x_y(coarse_fewshot_pretrained_on_coarse_results)
     plt.plot(x, y, color="tab:blue", label="coarse")
     plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:blue")
-    x, y = zip(*coarse_without_misc_mean)
-    k, sigma = zip(*coarse_without_misc_std)
-    lower_bound = np.array(y) - np.array(sigma)
-    upper_bound = np.array(y) + np.array(sigma)
-    lower_bound = lower_bound.clip(min=0)
-    plt.plot(x, y, color="tab:orange", label="coarse without misc")
+
+    x, y, lower_bound, upper_bound = extract_x_y(coarse_fewshot_pretrained_on_coarse_no_misc_results)
+    plt.plot(x, y, color="tab:orange", label="coarse-no-misc")
     plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:orange")
-    x, y = zip(*fine_mean)
-    k, sigma = zip(*fine_std)
-    lower_bound = np.array(y) - np.array(sigma)
-    upper_bound = np.array(y) + np.array(sigma)
-    lower_bound = lower_bound.clip(min=0)
-    plt.plot(x, y, color="tab:brown", label="fine")
+
+    x, y, lower_bound, upper_bound = extract_x_y(coarse_fewshot_pretrained_on_fine_results)
+    plt.plot(x, y, color="tab:green", label="fine")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:green")
+
+    x, y, lower_bound, upper_bound = extract_x_y(coarse_fewshot_pretrained_on_coarse_fine_results)
+    plt.plot(x, y, color="tab:brown", label="coarse-fine")
     plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:brown")
-    x, y = zip(*coarse_fine_mean)
-    k, sigma = zip(*coarse_fine_std)
-    lower_bound = np.array(y) - np.array(sigma)
-    upper_bound = np.array(y) + np.array(sigma)
-    lower_bound = lower_bound.clip(min=0)
-    plt.plot(x, y, color="tab:purple", label="coarse fine")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:purple")
+
+    x, y, lower_bound, upper_bound = extract_x_y(coarse_low_resource_dual_encoder_results)
+    plt.plot(x, y, color="tab:cyan", label="no pretraining")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:cyan")
+
+    x, y, lower_bound, upper_bound = extract_x_y(coarse_low_resource_flert_results)
+    plt.plot(x, y, color="tab:pink", label="FLERT")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:pink")
+
+    plt.legend(loc="lower right", title="pretraining labels")
+    plt.xlabel("k-shots")
+    plt.ylabel("F1 score (span-level)")
+    plt.title("Impact of label verbalizers - few-shot on coarse labels")
+    plt.show()
+
+    plt.style.use("seaborn")
+    plt.plot()
+
+    plt.plot(
+        np.array([0, 1, 2, 4, 8, 16, 32, 64]),
+        np.array([fine_pretrained_score] * 8),
+        color="red",
+        label="full-finetuning",
+    )
+
+    x, y, lower_bound, upper_bound = extract_x_y(fine_fewshot_pretrained_on_coarse_results)
+    plt.plot(x, y, color="tab:blue", label="coarse")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:blue")
+
+    x, y, lower_bound, upper_bound = extract_x_y(fine_fewshot_pretrained_on_coarse_no_misc_results)
+    plt.plot(x, y, color="tab:orange", label="coarse-no-misc")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:orange")
+
+    x, y, lower_bound, upper_bound = extract_x_y(fine_fewshot_pretrained_on_fine_results)
+    plt.plot(x, y, color="tab:green", label="fine")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:green")
+
+    x, y, lower_bound, upper_bound = extract_x_y(fine_fewshot_pretrained_on_coarse_fine_results)
+    plt.plot(x, y, color="tab:brown", label="coarse-fine")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:brown")
+
+    x, y, lower_bound, upper_bound = extract_x_y(fine_low_resource_dual_encoder_results)
+    plt.plot(x, y, color="tab:cyan", label="no pretraining")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:cyan")
+
+    x, y, lower_bound, upper_bound = extract_x_y(fine_low_resource_flert_results)
+    plt.plot(x, y, color="tab:pink", label="FLERT")
+    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:pink")
+
     plt.legend(loc="lower right", title="pretraining labels")
     plt.xlabel("k-shots")
     plt.ylabel("F1 score (span-level)")
