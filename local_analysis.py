@@ -418,7 +418,13 @@ def extract_multiple_runs(path):
 
     import numpy as np
 
-    files = glob.glob(f"{path}/*10*")
+    files = (
+        glob.glob(f"{path}/*10*")
+        + glob.glob(f"{path}/*20*")
+        + glob.glob(f"{path}/*30*")
+        + glob.glob(f"{path}/*40*")
+        + glob.glob(f"{path}/*50*")
+    )
     results = {}
     for file in files:
         k = file.split("/")[-1].split("_")[0].replace("shot", "")
@@ -460,6 +466,10 @@ def extended_experiments():
     import matplotlib.pyplot as plt
     import numpy as np
 
+    granularities = ["coarse", "fine", "coarse-fine", "coarse-without-misc"]
+    pretraining_seeds = [10, 20, 30, 40, 50]
+    # k = [0, 1, 2, 4, 8, 16, 32, 64]
+
     pretrained_dual_encoder_path = Path(
         "/glusterfs/dfs-gfs-dist/goldejon/flair-models/pretrained-dual-encoder/masked-models"
     )
@@ -469,23 +479,41 @@ def extended_experiments():
     low_resource_flert_path = Path("/glusterfs/dfs-gfs-dist/goldejon/flair-models/lowresource-flert/masked-models")
     fewshot_dual_encoder_path = Path("/glusterfs/dfs-gfs-dist/goldejon/flair-models/fewshot-dual-encoder/masked-models")
 
-    coarse_pretrained_score = extract_single_run(
-        pretrained_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-inverse-masked_1e-05-10"
-    )
-    fine_pretrained_score = extract_single_run(
-        pretrained_dual_encoder_path / "bert-base-uncased_fewnerd-fine-inverse-masked_1e-05-10"
-    )
+    full_finetuning_scores = {}
+    for granularity in granularities:
+        scores = []
+        for pretraining_seed in pretraining_seeds:
+            scores.append(
+                extract_single_run(
+                    pretrained_dual_encoder_path
+                    / f"bert-base-uncased_fewnerd-{granularity}-inverse-masked_1e-05-{pretraining_seed}"
+                )
+            )
+        full_finetuning_scores[granularity] = {
+            "scores": np.array(scores),
+            "average": np.mean(scores),
+            "std": np.std(scores),
+        }
 
     coarse_low_resource_dual_encoder_results = extract_multiple_runs(
         low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-masked_1e-05_early-stopping"
     )
+    # coarse_no_misc_low_resource_dual_encoder_results = extract_multiple_runs(
+    #    low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-without-misc-masked_1e-05_early-stopping"
+    # )
     fine_low_resource_dual_encoder_results = extract_multiple_runs(
         low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-fine-masked_1e-05_early-stopping"
     )
+    # coarse_fine_low_resource_dual_encoder_results = extract_multiple_runs(
+    #    low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-fine-masked_1e-05_early-stopping"
+    # )
 
     coarse_low_resource_flert_results = extract_multiple_runs(
         low_resource_flert_path / "bert-base-uncased_fewnerd-coarse-masked_1e-05_early-stopping"
     )
+    # coarse_no_misc_low_resource_flert_results = extract_multiple_runs(
+    #    low_resource_flert_path / "bert-base-uncased_fewnerd-coarse-without-misc-masked_1e-05_early-stopping"
+    # )
     fine_low_resource_flert_results = extract_multiple_runs(
         low_resource_flert_path / "bert-base-uncased_fewnerd-fine-masked_1e-05_early-stopping"
     )
@@ -529,7 +557,7 @@ def extended_experiments():
 
     plt.plot(
         np.array([0, 1, 2, 4, 8, 16, 32, 64]),
-        np.array([coarse_pretrained_score] * 8),
+        np.array([1] * 8),
         color="red",
         label="full-finetuning",
     )
@@ -569,7 +597,7 @@ def extended_experiments():
 
     plt.plot(
         np.array([0, 1, 2, 4, 8, 16, 32, 64]),
-        np.array([fine_pretrained_score] * 8),
+        np.array([1] * 8),
         color="red",
         label="full-finetuning",
     )
@@ -603,3 +631,7 @@ def extended_experiments():
     plt.ylabel("F1 score (span-level)")
     plt.title("Impact of label verbalizers - few-shot on coarse labels")
     plt.show()
+
+
+if __name__ == "__main__":
+    extended_experiments()
