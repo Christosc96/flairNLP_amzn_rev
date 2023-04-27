@@ -413,8 +413,10 @@ def extract_single_run(path, k="1"):
                 return round(float(line.split()[-2]) * 100, 2)
 
 
-def extract_multiple_runs(path):
+def extract_multiple_runs(path, nested=False):
     import glob
+    import re
+    from pathlib import Path
 
     import numpy as np
 
@@ -427,18 +429,50 @@ def extract_multiple_runs(path):
     )
     results = {}
     for file in files:
-        k = file.split("/")[-1].split("_")[0].replace("shot", "")
-
-        f1_score = extract_single_run(path / file, k)
-        if k not in results:
-            results[k] = {}
-            results[k]["results"] = [f1_score]
+        if nested:
+            pattern = r"fewnerd-(.*?)-masked"
+            fewshot_granularity = file.split("/")[-1].split("_")[1]
+            match = re.search(pattern, fewshot_granularity)
+            if match:
+                fewshot_granularity = match.group(1)
+            pretrain_granularity = file.split("/")[-1].split("_")[2]
+            match = re.search(pattern, pretrain_granularity)
+            if match:
+                pretrain_granularity = match.group(1)
+            exp_key = f"{pretrain_granularity}-to-{fewshot_granularity}"
+            if exp_key not in results:
+                results[exp_key] = {}
         else:
-            results[k]["results"].append(f1_score)
+            k = file.split("/")[-1].split("_")[0].replace("shot", "")
 
-    for key, result_dict in results.items():
-        results[key]["average"] = np.mean(result_dict["results"])
-        results[key]["std"] = np.std(result_dict["results"])
+        if nested:
+            experiment_files = glob.glob(f"{file}/*")
+            for exp_file in experiment_files:
+                if ".json" not in exp_file:
+                    k = exp_file.split("/")[-1].split("_")[0].replace("shot", "")
+                    f1_score = extract_single_run(Path(file) / exp_file, k)
+                    if k not in results[exp_key]:
+                        results[exp_key][k] = {}
+                        results[exp_key][k]["results"] = [f1_score]
+                    else:
+                        results[exp_key][k]["results"].append(f1_score)
+        else:
+            f1_score = extract_single_run(path / file, k)
+            if k not in results:
+                results[k] = {}
+                results[k]["results"] = [f1_score]
+            else:
+                results[k]["results"].append(f1_score)
+
+    if nested:
+        for exp, result_dicts in results.items():
+            for exp_k, result_dict in result_dicts.items():
+                results[exp][exp_k]["average"] = np.mean(result_dict["results"])
+                results[exp][exp_k]["std"] = np.std(result_dict["results"])
+    else:
+        for key, result_dict in results.items():
+            results[key]["average"] = np.mean(result_dict["results"])
+            results[key]["std"] = np.std(result_dict["results"])
     return results
 
 
@@ -460,6 +494,22 @@ def extract_x_y(result_dict):
     return x, y, lower_bound, upper_bound
 
 
+def get_font_color(rgba, threshold=0.5):
+    import matplotlib.colors as mcolors
+
+    # Convert the RGBA color to an RGB color
+    rgb = mcolors.to_rgb(rgba)
+
+    # Calculate the luminance of the color
+    luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+
+    # Return a light font color if the luminance is below the threshold, otherwise a dark font color
+    if luminance < threshold:
+        return "white"
+    else:
+        return "black"
+
+
 def extended_experiments():
     from pathlib import Path
 
@@ -468,7 +518,6 @@ def extended_experiments():
 
     granularities = ["coarse", "fine", "coarse-fine", "coarse-without-misc"]
     pretraining_seeds = [10, 20, 30, 40, 50]
-    # k = [0, 1, 2, 4, 8, 16, 32, 64]
 
     pretrained_dual_encoder_path = Path(
         "/glusterfs/dfs-gfs-dist/goldejon/flair-models/pretrained-dual-encoder/masked-models"
@@ -490,147 +539,133 @@ def extended_experiments():
                 )
             )
         full_finetuning_scores[granularity] = {
-            "scores": np.array(scores),
+            "results": np.array(scores),
             "average": np.mean(scores),
             "std": np.std(scores),
         }
 
-    coarse_low_resource_dual_encoder_results = extract_multiple_runs(
-        low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-masked_1e-05_early-stopping"
-    )
-    # coarse_no_misc_low_resource_dual_encoder_results = extract_multiple_runs(
-    #    low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-without-misc-masked_1e-05_early-stopping"
-    # )
-    fine_low_resource_dual_encoder_results = extract_multiple_runs(
-        low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-fine-masked_1e-05_early-stopping"
-    )
-    # coarse_fine_low_resource_dual_encoder_results = extract_multiple_runs(
-    #    low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-fine-masked_1e-05_early-stopping"
-    # )
+    low_resource_dual_encoder_results = {
+        "coarse": extract_multiple_runs(
+            low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-masked_1e-05_early-stopping"
+        ),
+        "coarse-without-misc": extract_multiple_runs(
+            low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-without-misc-masked_1e-05_early-stopping"
+        ),
+        "fine": extract_multiple_runs(
+            low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-fine-masked_1e-05_early-stopping"
+        ),
+        "coarse-fine": extract_multiple_runs(
+            low_resource_dual_encoder_path / "bert-base-uncased_fewnerd-coarse-fine-masked_1e-05_early-stopping"
+        ),
+    }
 
-    coarse_low_resource_flert_results = extract_multiple_runs(
-        low_resource_flert_path / "bert-base-uncased_fewnerd-coarse-masked_1e-05_early-stopping"
-    )
-    # coarse_no_misc_low_resource_flert_results = extract_multiple_runs(
-    #    low_resource_flert_path / "bert-base-uncased_fewnerd-coarse-without-misc-masked_1e-05_early-stopping"
-    # )
-    fine_low_resource_flert_results = extract_multiple_runs(
-        low_resource_flert_path / "bert-base-uncased_fewnerd-fine-masked_1e-05_early-stopping"
-    )
+    low_resource_flert_results = {
+        "coarse": extract_multiple_runs(
+            low_resource_flert_path / "bert-base-uncased_fewnerd-coarse-masked_1e-05_early-stopping"
+        ),
+        "coarse-without-misc": extract_multiple_runs(
+            low_resource_flert_path / "bert-base-uncased_fewnerd-coarse-without-misc-masked_1e-05_early-stopping"
+        ),
+        "fine": extract_multiple_runs(
+            low_resource_flert_path / "bert-base-uncased_fewnerd-fine-masked_1e-05_early-stopping"
+        ),
+    }
 
-    coarse_fewshot_pretrained_on_coarse_results = extract_multiple_runs(
-        fewshot_dual_encoder_path
-        / "bert-base-uncased_fewnerd-coarse-fine-masked_pretrained-on-fewnerd-coarse-masked-10_1e-05_early-stopping"
-    )
-    coarse_fewshot_pretrained_on_coarse_no_misc_results = extract_multiple_runs(
-        fewshot_dual_encoder_path
-        / "bert-base-uncased_fewnerd-coarse-fine-masked_pretrained-on-fewnerd-coarse-without-misc-masked-10_1e-05_early-stopping"
-    )
-    coarse_fewshot_pretrained_on_fine_results = extract_multiple_runs(
-        fewshot_dual_encoder_path
-        / "bert-base-uncased_fewnerd-coarse-fine-masked_pretrained-on-fewnerd-fine-masked-10_1e-05_early-stopping"
-    )
-    coarse_fewshot_pretrained_on_coarse_fine_results = extract_multiple_runs(
-        fewshot_dual_encoder_path
-        / "bert-base-uncased_fewnerd-coarse-fine-masked_pretrained-on-fewnerd-coarse-fine-masked-10_1e-05_early-stopping"
-    )
+    fewshot_results = extract_multiple_runs(fewshot_dual_encoder_path, nested=True)
 
-    fine_fewshot_pretrained_on_coarse_results = extract_multiple_runs(
-        fewshot_dual_encoder_path
-        / "bert-base-uncased_fewnerd-fine-masked_pretrained-on-fewnerd-coarse-masked-10_1e-05_early-stopping"
-    )
-    fine_fewshot_pretrained_on_coarse_no_misc_results = extract_multiple_runs(
-        fewshot_dual_encoder_path
-        / "bert-base-uncased_fewnerd-fine-masked_pretrained-on-fewnerd-coarse-without-misc-masked-10_1e-05_early-stopping"
-    )
-    fine_fewshot_pretrained_on_fine_results = extract_multiple_runs(
-        fewshot_dual_encoder_path
-        / "bert-base-uncased_fewnerd-fine-masked_pretrained-on-fewnerd-fine-masked-10_1e-05_early-stopping"
-    )
-    fine_fewshot_pretrained_on_coarse_fine_results = extract_multiple_runs(
-        fewshot_dual_encoder_path
-        / "bert-base-uncased_fewnerd-fine-masked_pretrained-on-fewnerd-coarse-fine-masked-10_1e-05_early-stopping"
-    )
+    colors = {"coarse": "tab:blue", "coarse-without-misc": "tab:orange", "fine": "tab:green", "coarse-fine": "tab:red"}
+    axes = {"coarse": (0, 0), "coarse-without-misc": (0, 1), "fine": (1, 0), "coarse-fine": (1, 1)}
 
-    plt.style.use("seaborn")
-    plt.plot()
+    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(12, 12))
+    fig.suptitle("Domain transfer within FewNERD on unseen labels")
+    for granularity in granularities:
 
-    plt.plot(
-        np.array([0, 1, 2, 4, 8, 16, 32, 64]),
-        np.array([1] * 8),
-        color="red",
-        label="full-finetuning",
-    )
+        axs[axes[granularity]].set_title(f"Few-shot on: {granularity}")
+        axs[axes[granularity]].set_xlabel("k-shots per class")
+        axs[axes[granularity]].set_ylabel("F1-score (span-level)")
+        axs[axes[granularity]].set_xscale("log")
 
-    x, y, lower_bound, upper_bound = extract_x_y(coarse_fewshot_pretrained_on_coarse_results)
-    plt.plot(x, y, color="tab:blue", label="coarse")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:blue")
+        x = np.array([0, 1, 2, 4, 8, 16, 32, 64])
+        y = np.array([full_finetuning_scores[granularity]["average"]] * 8)
+        sigma = [full_finetuning_scores[granularity]["std"]] * 8
+        lower_bound = y - sigma
+        upper_bound = y + sigma
+        lower_bound = lower_bound.clip(min=0)
+        axs[axes[granularity]].plot(x, y, color="black", linestyle="--", linewidth=1, label="full-finetuning")
+        axs[axes[granularity]].fill_between(x, lower_bound, upper_bound, alpha=0.15, color="black")
 
-    x, y, lower_bound, upper_bound = extract_x_y(coarse_fewshot_pretrained_on_coarse_no_misc_results)
-    plt.plot(x, y, color="tab:orange", label="coarse-no-misc")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:orange")
+        if granularity == "coarse-fine":
+            x, y, lower_bound, upper_bound = extract_x_y(low_resource_flert_results["fine"])
+        else:
+            x, y, lower_bound, upper_bound = extract_x_y(low_resource_flert_results[granularity])
+        axs[axes[granularity]].plot(x, y, linewidth=1, color="tab:brown", label="FLERT")
+        axs[axes[granularity]].fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:brown")
 
-    x, y, lower_bound, upper_bound = extract_x_y(coarse_fewshot_pretrained_on_fine_results)
-    plt.plot(x, y, color="tab:green", label="fine")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:green")
+        x, y, lower_bound, upper_bound = extract_x_y(low_resource_dual_encoder_results[granularity])
+        axs[axes[granularity]].plot(x, y, linewidth=1, color="tab:gray", label="no-pretraining")
+        axs[axes[granularity]].fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:gray")
 
-    x, y, lower_bound, upper_bound = extract_x_y(coarse_fewshot_pretrained_on_coarse_fine_results)
-    plt.plot(x, y, color="tab:brown", label="coarse-fine")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:brown")
+        for exp, results in fewshot_results.items():
+            if exp.endswith(f"to-{granularity}"):
+                pretraining = exp.split("-to-")[0]
+                x, y, lower_bound, upper_bound = extract_x_y(results)
+                axs[axes[granularity]].plot(x, y, linewidth=1, color=colors[pretraining], label=pretraining)
+                axs[axes[granularity]].fill_between(x, lower_bound, upper_bound, alpha=0.15, color=colors[pretraining])
 
-    x, y, lower_bound, upper_bound = extract_x_y(coarse_low_resource_dual_encoder_results)
-    plt.plot(x, y, color="tab:cyan", label="no pretraining")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:cyan")
-
-    x, y, lower_bound, upper_bound = extract_x_y(coarse_low_resource_flert_results)
-    plt.plot(x, y, color="tab:pink", label="FLERT")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:pink")
-
-    plt.legend(loc="lower right", title="pretraining labels")
-    plt.xlabel("k-shots")
-    plt.ylabel("F1 score (span-level)")
-    plt.title("Impact of label verbalizers - few-shot on coarse labels")
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=2)
     plt.show()
 
-    plt.style.use("seaborn")
-    plt.plot()
+    import pandas as pd
 
-    plt.plot(
-        np.array([0, 1, 2, 4, 8, 16, 32, 64]),
-        np.array([1] * 8),
-        color="red",
-        label="full-finetuning",
+    for k in ["0", "1", "2", "4", "8", "16", "32", "64"]:
+        df = pd.DataFrame(index=granularities, columns=granularities)
+        for exp, exp_results in fewshot_results.items():
+            pretraining, fewshot = exp.split("-to-")
+            df[fewshot][pretraining] = exp_results[k]["average"]
+        df = pd.DataFrame(data=df.values.astype("float"), index=granularities, columns=granularities)
+
+        # Plot the DataFrame as a matrix
+        fig, ax = plt.subplots(figsize=(14, 14))
+        im = ax.imshow(df, cmap="viridis")
+        # Set axis labels
+        ax.set_xticks(range(len(df.columns)))
+        ax.set_yticks(range(len(df.index)))
+        ax.set_xticklabels(df.columns)
+        ax.set_yticklabels(df.index)
+        ax.set_xlabel("Few-Shot on:")
+        ax.set_ylabel("Pretrained on:")
+        ax.grid(False)
+        # Set axis labels to be displayed at 45 degrees
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        # Loop over data dimensions and create text annotations
+        for i in range(len(df.index)):
+            for j in range(len(df.columns)):
+                text = ax.text(
+                    j,
+                    i,
+                    round(float(df.iloc[i, j]), 2),
+                    ha="center",
+                    va="center",
+                )
+                text.set_color(get_font_color(im.cmap(im.norm(df.iloc[i, j]))))
+                text.set_fontsize(12)
+
+        # Set title
+        ax.set_title(f"Details on {k}-shots")
+        # Add colorbar
+        fig.colorbar(im)
+        plt.show()
+
+    df = pd.DataFrame(
+        columns=granularities,
+        index=pd.MultiIndex.from_product([["0", "1", "2", "4", "8", "16", "32", "64"], granularities]),
     )
-
-    x, y, lower_bound, upper_bound = extract_x_y(fine_fewshot_pretrained_on_coarse_results)
-    plt.plot(x, y, color="tab:blue", label="coarse")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:blue")
-
-    x, y, lower_bound, upper_bound = extract_x_y(fine_fewshot_pretrained_on_coarse_no_misc_results)
-    plt.plot(x, y, color="tab:orange", label="coarse-no-misc")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:orange")
-
-    x, y, lower_bound, upper_bound = extract_x_y(fine_fewshot_pretrained_on_fine_results)
-    plt.plot(x, y, color="tab:green", label="fine")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:green")
-
-    x, y, lower_bound, upper_bound = extract_x_y(fine_fewshot_pretrained_on_coarse_fine_results)
-    plt.plot(x, y, color="tab:brown", label="coarse-fine")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:brown")
-
-    x, y, lower_bound, upper_bound = extract_x_y(fine_low_resource_dual_encoder_results)
-    plt.plot(x, y, color="tab:cyan", label="no pretraining")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:cyan")
-
-    x, y, lower_bound, upper_bound = extract_x_y(fine_low_resource_flert_results)
-    plt.plot(x, y, color="tab:pink", label="FLERT")
-    plt.fill_between(x, lower_bound, upper_bound, alpha=0.15, color="tab:pink")
-
-    plt.legend(loc="lower right", title="pretraining labels")
-    plt.xlabel("k-shots")
-    plt.ylabel("F1 score (span-level)")
-    plt.title("Impact of label verbalizers - few-shot on coarse labels")
-    plt.show()
+    for exp, exp_results in fewshot_results.items():
+        pretraining, fewshot = exp.split("-to-")
+        for k in exp_results.keys():
+            df.loc[k, fewshot][pretraining] = exp_results[k]["average"]
+    print(df)
 
 
 if __name__ == "__main__":
