@@ -4792,7 +4792,7 @@ class NER_NERMUD(MultiCorpus):
         )
 
 
-class AFRICA_POS(MultiCorpus):
+class MASAKHA_POS(MultiCorpus):
     def __init__(
         self,
         languages: Union[str, List[str]] = "bam",
@@ -4801,9 +4801,9 @@ class AFRICA_POS(MultiCorpus):
         in_memory: bool = True,
         **corpusargs,
     ) -> None:
-        """Initialize the AfricaPOS corpus available on https://github.com/masakhane-io/masakhane-pos.
+        """Initialize the MasakhaPOS corpus available on https://github.com/masakhane-io/masakhane-pos.
 
-        It consists of ten African languages. Pass a language code or a list of language codes to initialize the corpus
+        It consists of 20 African languages. Pass a language code or a list of language codes to initialize the corpus
         with the languages you require. If you pass "all", all languages will be initialized.
         :version: Specifies version of the dataset. Currently, only "v1" is supported.
         :param base_path: Default is None, meaning that corpus gets auto-downloaded and loaded. You can override this
@@ -4867,7 +4867,7 @@ class AFRICA_POS(MultiCorpus):
             if language not in supported_languages:
                 log.error(f"Language '{language}' is not in list of supported languages!")
                 log.error(f"Supported are '{supported_languages}'!")
-                log.error("Instantiate this Corpus for instance like so 'corpus = AFRICA_POS(languages='luo')'")
+                log.error("Instantiate this Corpus for instance like so 'corpus = MASAKHA_POS(languages='luo')'")
                 raise Exception
 
             language_folder = data_folder / language
